@@ -1,11 +1,11 @@
 # rocketmq-destruction
-- broker:本地list存储JSON，consumer：定时轮询拉取消息；
-- consumer：改造为长连接获取消息
+- (1-PBC) broker:本地list存储JSON，consumer：定时轮询拉取消息；
+- (2-PBC-LO) consumer、broker：改造为长连接获取消息
 - broker：修改为rocketmq的消息协议，引入topic、tag
 - broker：改为本地文件存储，引入commitLog、consumeQueue
+- consumer：引入消费者线程模型、消费进度管理
 - nameserver：引入nameserver
 - producer、consumer: 引入负载均衡
-- consumer：引入消费者线程模型、消费进度管理
 - producer、consumer：引入消息重试
 - broker：实现服务端消息过滤
 - broker：实现事务消息
@@ -16,9 +16,10 @@
 - consumer: Modify to long connection to get messages.
 - broker: Modify to the message protocol of rocketmq, introduce topic, tag. 
 - broker: change to local file storage, introduce commitLog, consumeQueue.
+- consumer: introduce consumer thread model, consumer schedule management
 - nameserver: introduce nameserver.
 - producers and consumers: Introducing load balancing.
-- consumer: introduce consumer thread model, consumer schedule management-producer, consumer: introduce message retry.
+- producer and consumer: introduce message retry.
 - broker: Implement server level message filtering.
 - broker: Implement transaction messages.
 - broker: Implement delay messages.

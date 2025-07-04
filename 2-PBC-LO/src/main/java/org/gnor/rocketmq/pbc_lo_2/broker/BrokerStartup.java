@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.broker_1;
+package org.gnor.rocketmq.pbc_lo_2.broker;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -25,6 +25,9 @@ public class BrokerStartup {
     protected final EventLoopGroup eventLoopGroupBoss;
     protected final NettyServerHandler serverHandler;
 
+    /*v2版本新增：消费长轮询机制*/
+    protected final RequestHoldService requestHoldService;
+
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
 
     //本地存储列表
@@ -35,6 +38,8 @@ public class BrokerStartup {
         this.eventLoopGroupSelector = new NioEventLoopGroup(3, new ThreadFactoryImpl("NettyServerNIOSelector_"));
         this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactoryImpl("NettyNIOBoss_"));
         this.serverHandler = new NettyServerHandler();
+
+        this.requestHoldService = new RequestHoldService();
     }
 
     public void start() {
@@ -43,6 +48,8 @@ public class BrokerStartup {
             ChannelFuture sync = serverBootstrap.bind().sync();
             InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();
             System.out.println("Broker started, listening 0.0.0.0:" + addr.getPort());
+
+            new Thread(requestHoldService).start();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -86,20 +93,24 @@ public class BrokerStartup {
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
                         storeMSG.add(remotingCommand); //存储消息
-
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Response echo!!!!");
                         channelHandlerContext.channel().writeAndFlush(response);
+
+                        requestHoldService.notifyMessageArriving(remotingCommand);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
-                        response.setFlag(RemotingCommand.RESPONSE_FLAG);
-                        String hey = "Message`s empty!";
-                        if (!storeMSG.isEmpty()) {
-                            hey = storeMSG.get(0).getHey();
-                            storeMSG.remove(0);
-                        }
-                        response.setHey(hey);
-                        channelHandlerContext.channel().writeAndFlush(response);
+                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
+                        requestHoldService.getSuspendRequestList().add(sr);
+
+                        //response.setFlag(RemotingCommand.RESPONSE_FLAG);
+                        //String hey = "Message`s empty!";
+                        //if (!storeMSG.isEmpty()) {
+                        //    hey = storeMSG.get(0).getHey();
+                        //    storeMSG.remove(0);
+                        //}
+                        //response.setHey(hey);
+                        //channelHandlerContext.channel().writeAndFlush(response);
                         break;
                     default:
                         break;

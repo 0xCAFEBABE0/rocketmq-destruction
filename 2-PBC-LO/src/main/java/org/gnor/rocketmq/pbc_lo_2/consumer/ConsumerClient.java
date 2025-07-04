@@ -1,18 +1,16 @@
-package org.gnor.rocketmq.consumer_1;
+package org.gnor.rocketmq.pbc_lo_2.consumer;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.timeout.IdleStateHandler;
 import org.gnor.rocketmq.common_1.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class ConsumerClient {
     private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumerKeepingService"));
@@ -50,8 +48,8 @@ public class ConsumerClient {
             this.channel = f.channel();
             this.isRunning = true;
             System.out.println("已连接到服务器: " + host + ":" + port);
-            // 启动定时拉取消息任务
-            startScheduledPullMessage();
+            //startScheduledPullMessage();
+            pullMessage();
             // 等待连接关闭
             f.channel().closeFuture().sync();
         } finally {
@@ -63,23 +61,7 @@ public class ConsumerClient {
         }
     }
 
-    /**
-     * 启动定时拉取消息任务
-     */
-    private void startScheduledPullMessage() {
-        scheduledExecutorService.scheduleWithFixedDelay(() -> {
-            if (isRunning && channel != null && channel.isActive()) {
-                try {
-                    pullMessage();
-                } catch (Exception e) {
-                    System.err.println("拉取消息失败: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-        }, 0, 5, TimeUnit.SECONDS);
-    }
-
-    private void pullMessage() {
+    public void pullMessage() {
         RemotingCommand remotingCommand = new RemotingCommand();
         remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
         remotingCommand.setCode(RemotingCommand.CONSUMER_MSG);
@@ -90,13 +72,15 @@ public class ConsumerClient {
     }
 
     // 客户端处理器
-    static class ClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
+    public class ClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) {
             // 读取服务器发送的消息
             if (msg.getFlag() == RemotingCommand.RESPONSE_FLAG) {
                 System.out.println("收到服务器响应消息: " + msg.getHey() + " [时间: " +
                         LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]");
+
+                ConsumerClient.this.pullMessage();
             } else {
                 System.out.println("收到服务器消息: " + msg.getHey());
             }
