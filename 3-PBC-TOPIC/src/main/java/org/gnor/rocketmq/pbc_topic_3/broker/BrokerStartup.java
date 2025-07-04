@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.pbc_lo_2.broker;
+package org.gnor.rocketmq.pbc_topic_3.broker;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -14,6 +14,8 @@ import org.gnor.rocketmq.common_1.*;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @version 1.0
@@ -30,8 +32,11 @@ public class BrokerStartup {
 
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
 
-    //本地存储列表
-    private static List<RemotingCommand> storeMSG = new ArrayList<>();
+    /*v3版本新增：本地按topic存储列表*/
+    private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
+    public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
+        return storeTopicRecord;
+    }
 
     public BrokerStartup() {
         this.serverBootstrap = new ServerBootstrap();
@@ -39,7 +44,7 @@ public class BrokerStartup {
         this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactoryImpl("NettyNIOBoss_"));
         this.serverHandler = new NettyServerHandler();
 
-        this.requestHoldService = new RequestHoldService();
+        this.requestHoldService = new RequestHoldService(this);
     }
 
     public void start() {
@@ -85,23 +90,32 @@ public class BrokerStartup {
     public class NettyServerHandler extends SimpleChannelInboundHandler<RemotingCommand> {
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, RemotingCommand remotingCommand) {
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, RemotingCommand remotingCommand) throws InterruptedException {
             System.out.println("Received MSG:" + remotingCommand.getHey());
             if (RemotingCommand.REQUEST_FLAG == remotingCommand.getFlag()) {
 
+                String topic = remotingCommand.getTopic();
                 RemotingCommand response = new RemotingCommand();
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
-                        storeMSG.add(remotingCommand); //存储消息
+
+                        List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
+                        storeList.add(remotingCommand);
+                        storeTopicRecord.put(topic, storeList);
+                        //storeMSG.add(remotingCommand); //存储消息
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Response echo!!!!");
                         channelHandlerContext.channel().writeAndFlush(response);
 
-                        requestHoldService.notifyMessageArriving(remotingCommand);
+                        requestHoldService.notifyMessageArriving(topic);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
                         SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
-                        requestHoldService.getSuspendRequestList().add(sr);
+                        //todo 可移到RequestHoldService统一管理
+                        ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
+                        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
+                        suspendRequestList.add(sr);
+                        suspendRequests.put(topic, suspendRequestList);
                         break;
                     default:
                         break;

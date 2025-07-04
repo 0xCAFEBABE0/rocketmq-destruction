@@ -13,6 +13,9 @@ public class RemotingCommand {
     private String hey;
     private transient byte[] body;
 
+    /*v3版本新增 */
+    private String topic;
+
 
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
@@ -47,6 +50,14 @@ public class RemotingCommand {
 
     public static int getHeaderLength(int length) {
         return length & 0xFFFFFF;
+    }
+
+    public String getTopic() {
+        return topic;
+    }
+
+    public void setTopic(String topic) {
+        this.topic = topic;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

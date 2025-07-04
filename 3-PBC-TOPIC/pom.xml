@@ -6,7 +6,7 @@
         <artifactId>rocketmq-destruction</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>2-PBC-LO</artifactId>
+    <artifactId>3-PBC-TOPIC</artifactId>
     <packaging>jar</packaging>
 
     <properties>
