@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 public class MessageStore {
     private ByteBuf byteBuf;
@@ -18,14 +19,22 @@ public class MessageStore {
     protected FileChannel fileChannel;
     protected MappedByteBuffer mappedByteBuffer;
 
-    // CommitLog file size,default is 1G
-    private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
+    protected volatile int wrotePosition;
+    protected static final AtomicIntegerFieldUpdater<MessageStore> WROTE_POSITION_UPDATER;
+
+    // CommitLog file size,default is 10M
+    //private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
+    private int mappedFileSizeCommitLog = 10 * 1024 * 1024;
+
+    static {
+        WROTE_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(MessageStore.class, "wrotePosition");
+    }
 
     public MessageStore() {
         ByteBufAllocator alloc = UnpooledByteBufAllocator.DEFAULT;
         this.byteBuf = alloc.directBuffer(Integer.MAX_VALUE);
 
-        File commitLog = new File("/");
+        File commitLog = new File("/Users/qudian/data/store/commitlog/00000000000000000000");
         try {
             File f = new File(commitLog.getParent());
             if (!f.exists()) {
@@ -37,8 +46,6 @@ public class MessageStore {
             throw new RuntimeException(e);
         }
     }
-
-
 
     public int calMsgLength(int bodyLength, int topicLength) {
         return 4 //TOTALSIZE
@@ -67,12 +74,30 @@ public class MessageStore {
 
     public void appendMessage(String topic, String body) {
         encode(topic, body);
-
-
         mappedByteBuffer.put(byteBuf.nioBuffer());
 
+        int currentPos = WROTE_POSITION_UPDATER.get(this);
         ByteBuffer slice = this.mappedByteBuffer.slice();
+        slice.position(currentPos);
 
+        WROTE_POSITION_UPDATER.addAndGet(this, byteBuf.getInt(0));
         this.mappedByteBuffer.force();
+    }
+
+    public void getMessage(int pos, int size) {
+        ByteBuffer slice = mappedByteBuffer.slice();
+        slice.position(pos);
+        ByteBuffer newSlice = slice.slice();
+        newSlice.limit(size);
+
+        int storeSize = newSlice.getInt();
+
+    }
+
+    public static void main(String[] args) {
+        MessageStore messageStore = new MessageStore();
+        messageStore.appendMessage("Topic-test", "aaaHello.");
+
+
     }
 }
