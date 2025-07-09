@@ -3,7 +3,7 @@
 - (2-PBC-LO) consumer、broker：改造为长连接获取消息
 - (3-PBC-TOPIC) producer、consumer、broker：引入topic，多消费者管理
 - (4-PBC-FILE) producer、consumer、broker：改为本地文件存储，修改为rocketmq的消息协议，引入commitLog
-- consumer：引入消费者线程模型、消费进度管理、consumeQueue
+- (5-PBC-CONSUMEQUEUE) consumer：引入消费者线程模型、消费进度管理、consumeQueue
 - nameserver：引入nameserver
 - producer、consumer: 引入负载均衡
 - producer、consumer：引入消息重试
