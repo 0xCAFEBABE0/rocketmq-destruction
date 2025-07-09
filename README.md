@@ -15,8 +15,8 @@
 - broker: Local list stores obj, consumer: polls regularly to pull messages;
 - consumer: Modify to long connection to get messages.
 - broker: introduce topic. 
-- broker: change to local file storage,modify to the message protocol of rocketmq, introduce commitLog, consumeQueue.
-- consumer: introduce consumer thread model, consumer schedule management
+- broker: change to local file storage,modify to the message protocol of rocketmq, introduce commitLog.
+- consumer: introduce consumer thread model, consumer schedule management、consumeQueue
 - nameserver: introduce nameserver.
 - producers and consumers: Introducing load balancing.
 - producer and consumer: introduce message retry.

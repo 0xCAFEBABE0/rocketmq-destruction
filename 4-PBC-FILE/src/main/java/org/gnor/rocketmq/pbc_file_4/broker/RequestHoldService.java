@@ -49,27 +49,32 @@ public class RequestHoldService implements Runnable {
             System.out.println("没有请求需要唤醒。");
             return;
         }
-        ConcurrentMap<String, List<RemotingCommand>> storeTopicRecord = this.brokerStartup.getStoreTopicRecord();
-        List<RemotingCommand> storeDataList = storeTopicRecord.get(topic);
+        //ConcurrentMap<String, List<RemotingCommand>> storeTopicRecord = this.brokerStartup.getStoreTopicRecord();
+        //List<RemotingCommand> storeDataList = storeTopicRecord.get(topic);
+        MessageStore messageStore = brokerStartup.getMessageStore();
 
         Iterator<SuspendRequest> it = suspendRequests.iterator();
         while (it.hasNext()) {
             SuspendRequest sr = it.next();
 
-            if (storeDataList.isEmpty() && System.currentTimeMillis() >= sr.getSuspendTimestamp() + 15000L) {
+            boolean hasMessages = messageStore.hasMessages(topic);
+            if (!hasMessages && System.currentTimeMillis() >= sr.getSuspendTimestamp() + 15000L) {
                 RemotingCommand msgNotFound = new RemotingCommand();
                 msgNotFound.setHey("Message not found!");
                 msgNotFound.setFlag(RemotingCommand.RESPONSE_FLAG);
                 sr.getClientChannel().writeAndFlush(msgNotFound);
                 it.remove();
-            } else if (!storeDataList.isEmpty()) {
-                Iterator<RemotingCommand> storeIt = storeDataList.iterator();
-                while (storeIt.hasNext()) {
-                    RemotingCommand msgArrivingCmd = storeIt.next();
-                    msgArrivingCmd.setFlag(RemotingCommand.RESPONSE_FLAG);
-                    sr.getClientChannel().writeAndFlush(msgArrivingCmd).sync();
-                    storeIt.remove();
+            } else if (hasMessages) {
+
+                MessageStore.StoredMessage storedMessage = messageStore.consumeMessage(topic);
+                if (null == storedMessage) {
+                    continue;
                 }
+                RemotingCommand msgArrivingCmd = new RemotingCommand();
+                msgArrivingCmd.setHey(storedMessage.getBody());
+                msgArrivingCmd.setTopic(storedMessage.getTopic());
+                msgArrivingCmd.setFlag(RemotingCommand.RESPONSE_FLAG);
+                sr.getClientChannel().writeAndFlush(msgArrivingCmd).sync();
                 it.remove();
             }
         }

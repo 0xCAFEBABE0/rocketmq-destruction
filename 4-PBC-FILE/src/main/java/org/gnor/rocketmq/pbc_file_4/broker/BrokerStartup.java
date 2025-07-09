@@ -38,6 +38,13 @@ public class BrokerStartup {
         return storeTopicRecord;
     }
 
+    /*v4版本新增：本地文件存储*/
+    private MessageStore messageStore;
+
+    public MessageStore getMessageStore() {
+        return messageStore;
+    }
+
     public BrokerStartup() {
         this.serverBootstrap = new ServerBootstrap();
         this.eventLoopGroupSelector = new NioEventLoopGroup(3, new ThreadFactoryImpl("NettyServerNIOSelector_"));
@@ -45,6 +52,7 @@ public class BrokerStartup {
         this.serverHandler = new NettyServerHandler();
 
         this.requestHoldService = new RequestHoldService(this);
+        this.messageStore = new MessageStore();
     }
 
     public void start() {
@@ -99,14 +107,16 @@ public class BrokerStartup {
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
 
-                        List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
-                        storeList.add(remotingCommand);
-                        storeTopicRecord.put(topic, storeList);
+                        messageStore.appendMessage(topic, remotingCommand.getHey());
+                        /*迭代为文件存储*/
+                        //List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
+                        //storeList.add(remotingCommand);
+                        //storeTopicRecord.put(topic, storeList);
+
                         //storeMSG.add(remotingCommand); //存储消息
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Response echo!!!!");
                         channelHandlerContext.channel().writeAndFlush(response);
-
                         requestHoldService.notifyMessageArriving(topic);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
