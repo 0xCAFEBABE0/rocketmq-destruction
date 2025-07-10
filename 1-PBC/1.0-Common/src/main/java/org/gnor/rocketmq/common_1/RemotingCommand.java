@@ -16,6 +16,9 @@ public class RemotingCommand {
     /*v3版本新增 */
     private String topic;
 
+    /*v6版本新增 */
+    private long consumerOffset;
+    private String consumerGroup;
 
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
@@ -23,6 +26,8 @@ public class RemotingCommand {
 
     public static final int PRODUCER_MSG = 101;
     public static final int CONSUMER_MSG = 102;
+
+    public static final int QUERY_CONSUMER_OFFSET = 201;
 
     public String getHey() {
         return hey;
@@ -58,6 +63,22 @@ public class RemotingCommand {
 
     public void setTopic(String topic) {
         this.topic = topic;
+    }
+
+    public long getConsumerOffset() {
+        return consumerOffset;
+    }
+
+    public void setConsumerOffset(long consumerOffset) {
+        this.consumerOffset = consumerOffset;
+    }
+
+    public String getConsumerGroup() {
+        return consumerGroup;
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+        this.consumerGroup = consumerGroup;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {
