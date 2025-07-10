@@ -30,7 +30,8 @@ public class MessageStore {
     private int mappedFileSizeCommitLog = 10 * 1024 * 1024;
 
     //TEMP-> Track message metadata for each topic
-    private final ConcurrentMap<String /*topic*/, List<MessageMetadata>> topicMessageIndex = new ConcurrentHashMap<>();
+    //private final ConcurrentMap<String /*topic*/, List<MessageMetadata>> topicMessageIndex = new ConcurrentHashMap<>();
+
 
     // Message metadata class to track position and size
     public static class MessageMetadata {
@@ -142,7 +143,7 @@ public class MessageStore {
         System.out.println("Appended message at position: " + currentPos + ", length: " + msgLength);
 
         //v5版本新增：consumeQueue
-        consumeQueueStore.appendMessage(topic, currentPos, msgLength);
+        consumeQueueStore.appendMessage(topic, msgLength, currentPos);
     }
 
     public StoredMessage getMessage(int pos, int size) {
@@ -175,15 +176,23 @@ public class MessageStore {
     /**
      * Get and remove the first message for a specific topic (consume)
      */
+    //public StoredMessage consumeMessage(String topic) {
+    //    List<MessageMetadata> metadataList = topicMessageIndex.get(topic);
+    //    if (null == metadataList || metadataList.isEmpty()) {
+    //        return null;
+    //    }
+    //    MessageMetadata metadata = metadataList.remove(0);
+    //    // If no more messages for this topic, remove the topic entry
+    //    if (metadataList.isEmpty()) {
+    //        topicMessageIndex.remove(topic);
+    //    }
+    //    return getMessage(metadata.getPosition(), metadata.getSize());
+    //}
+
     public StoredMessage consumeMessage(String topic) {
-        List<MessageMetadata> metadataList = topicMessageIndex.get(topic);
-        if (null == metadataList || metadataList.isEmpty()) {
+        MessageMetadata metadata = consumeQueueStore.consumeMessage(topic);
+        if (null == metadata) {
             return null;
-        }
-        MessageMetadata metadata = metadataList.remove(0);
-        // If no more messages for this topic, remove the topic entry
-        if (metadataList.isEmpty()) {
-            topicMessageIndex.remove(topic);
         }
         return getMessage(metadata.getPosition(), metadata.getSize());
     }

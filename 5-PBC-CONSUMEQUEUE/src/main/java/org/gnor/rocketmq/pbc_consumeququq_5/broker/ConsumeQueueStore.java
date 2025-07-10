@@ -15,7 +15,15 @@ public class ConsumeQueueStore {
 
     public boolean hasMessages(String topic) {
         ConsumeQueue consumeQueue = consumeQueueTable.get(topic);
-        return null != consumeQueue && consumeQueue.wrotePosition > 0;
+        return null != consumeQueue && consumeQueue.readPosition < consumeQueue.wrotePosition;
+    }
+
+    public MessageStore.MessageMetadata consumeMessage(String topic) {
+        ConsumeQueue consumeQueue = consumeQueueTable.get(topic);
+        if (null == consumeQueue) {
+            return null;
+        }
+        return consumeQueue.consumeMessage();
     }
 
     public static class ConsumeQueue {
@@ -26,10 +34,13 @@ public class ConsumeQueueStore {
         private final String topic;
 
         protected volatile int wrotePosition;
+        protected volatile int readPosition;
         protected static final AtomicIntegerFieldUpdater<ConsumeQueue> WROTE_POSITION_UPDATER;
+        protected static final AtomicIntegerFieldUpdater<ConsumeQueue> READ_POSITION_UPDATER;
 
         static {
             WROTE_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(ConsumeQueue.class, "wrotePosition");
+            READ_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(ConsumeQueue.class, "readPosition");
         }
 
 
@@ -64,6 +75,25 @@ public class ConsumeQueueStore {
             mappedByteBuffer.put(writeBuffer);
             WROTE_POSITION_UPDATER.addAndGet(this, cqSize);
             this.mappedByteBuffer.force();
+        }
+
+        public MessageStore.MessageMetadata getCommitLogMetaFromCq(int cqPos) {
+            ByteBuffer readBuffer = mappedByteBuffer.duplicate();
+            readBuffer.position(cqPos);
+            readBuffer.limit(cqPos + cqSize);
+            long physicOffset = readBuffer.getLong();
+            int size = readBuffer.getInt();
+            return new MessageStore.MessageMetadata((int) physicOffset, size, topic);
+        }
+
+        public MessageStore.MessageMetadata consumeMessage() {
+            int currentPos = READ_POSITION_UPDATER.get(this);
+            if (currentPos >= wrotePosition) {
+                return null;
+            }
+            MessageStore.MessageMetadata metadata = getCommitLogMetaFromCq(currentPos);
+            READ_POSITION_UPDATER.addAndGet(this, cqSize);
+            return metadata;
         }
 
     }
