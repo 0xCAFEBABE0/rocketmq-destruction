@@ -42,15 +42,20 @@ public class MessageStore {
         private final int size;
         private final String topic;
 
-        public MessageMetadata(int position, int size, String topic) {
+        //v6版本新增
+        private long cqPosition;
+
+        public MessageMetadata(int position, int size, String topic, long cqPosition) {
             this.position = position;
             this.size = size;
             this.topic = topic;
+            this.cqPosition = cqPosition;
         }
 
         public int getPosition() { return position; }
         public int getSize() { return size; }
         public String getTopic() { return topic; }
+        public long getCqPosition() { return cqPosition; }
     }
 
     public static class StoredMessage {
@@ -100,11 +105,11 @@ public class MessageStore {
     /**
      * Check if there are any messages available for a topic
      */
-    public boolean hasMessages(String topic) {
+    public boolean hasMessages(String topic, long pullFromThisOffset) {
         //List<MessageStore.MessageMetadata> metadataList = topicMessageIndex.get(topic);
         //return null != metadataList && !metadataList.isEmpty();
         //v5版本新增：consumeQueue
-        return consumeQueueStore.hasMessages(topic);
+        return consumeQueueStore.hasMessages(topic, pullFromThisOffset);
     }
 
     public void encode(String topic, String body) {
@@ -193,13 +198,13 @@ public class MessageStore {
     //    return getMessage(metadata.getPosition(), metadata.getSize());
     //}
 
-    public StoredMessage consumeMessage(String topic) {
-        MessageMetadata metadata = consumeQueueStore.consumeMessage(topic);
+    public StoredMessage consumeMessage(String topic, long pullFromThisOffset) {
+        MessageMetadata metadata = consumeQueueStore.consumeMessage(topic, pullFromThisOffset);
         if (null == metadata) {
             return null;
         }
-
-        this.consumerOffsetManager.commitOffset(topic, metadata.getPosition() + metadata.getSize());
+        //v6版本新增：commitOffsetManager，写回commitOffset
+        this.consumerOffsetManager.commitOffset(topic, metadata.getCqPosition());
         return getMessage(metadata.getPosition(), metadata.getSize());
     }
 

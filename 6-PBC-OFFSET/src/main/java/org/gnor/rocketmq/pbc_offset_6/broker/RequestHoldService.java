@@ -58,7 +58,7 @@ public class RequestHoldService implements Runnable {
         while (it.hasNext()) {
             SuspendRequest sr = it.next();
 
-            boolean hasMessages = messageStore.hasMessages(topic);
+            boolean hasMessages = messageStore.hasMessages(topic, sr.getPullFromThisOffset());
             if (!hasMessages && System.currentTimeMillis() >= sr.getSuspendTimestamp() + 15000L) {
                 RemotingCommand msgNotFound = new RemotingCommand();
                 msgNotFound.setHey("Message not found!");
@@ -67,7 +67,7 @@ public class RequestHoldService implements Runnable {
                 it.remove();
             } else if (hasMessages) {
 
-                MessageStore.StoredMessage storedMessage = messageStore.consumeMessage(topic);
+                MessageStore.StoredMessage storedMessage = messageStore.consumeMessage(topic, sr.getPullFromThisOffset());
                 if (null == storedMessage) {
                     continue;
                 }

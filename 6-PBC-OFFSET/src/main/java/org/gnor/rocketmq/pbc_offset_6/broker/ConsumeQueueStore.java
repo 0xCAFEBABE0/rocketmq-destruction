@@ -13,17 +13,17 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 public class ConsumeQueueStore {
     protected final ConcurrentMap<String /*topic*/, ConsumeQueue> consumeQueueTable = new ConcurrentHashMap<>();
 
-    public boolean hasMessages(String topic) {
+    public boolean hasMessages(String topic, long pullFromThisOffset) {
         ConsumeQueue consumeQueue = consumeQueueTable.get(topic);
-        return null != consumeQueue && consumeQueue.readPosition < consumeQueue.wrotePosition;
+        return null != consumeQueue && pullFromThisOffset < consumeQueue.wrotePosition;
     }
 
-    public MessageStore.MessageMetadata consumeMessage(String topic) {
+    public MessageStore.MessageMetadata consumeMessage(String topic, long pullFromThisOffset) {
         ConsumeQueue consumeQueue = consumeQueueTable.get(topic);
         if (null == consumeQueue) {
             return null;
         }
-        return consumeQueue.consumeMessage();
+        return consumeQueue.consumeMessage(pullFromThisOffset);
     }
 
     public static class ConsumeQueue {
@@ -34,13 +34,13 @@ public class ConsumeQueueStore {
         private final String topic;
 
         protected volatile int wrotePosition;
-        protected volatile int readPosition;
+        //protected volatile int readPosition;
         protected static final AtomicIntegerFieldUpdater<ConsumeQueue> WROTE_POSITION_UPDATER;
-        protected static final AtomicIntegerFieldUpdater<ConsumeQueue> READ_POSITION_UPDATER;
+        //protected static final AtomicIntegerFieldUpdater<ConsumeQueue> READ_POSITION_UPDATER;
 
         static {
             WROTE_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(ConsumeQueue.class, "wrotePosition");
-            READ_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(ConsumeQueue.class, "readPosition");
+            //READ_POSITION_UPDATER = AtomicIntegerFieldUpdater.newUpdater(ConsumeQueue.class, "readPosition");
         }
 
 
@@ -83,16 +83,16 @@ public class ConsumeQueueStore {
             readBuffer.limit(cqPos + cqSize);
             long physicOffset = readBuffer.getLong();
             int size = readBuffer.getInt();
-            return new MessageStore.MessageMetadata((int) physicOffset, size, topic);
+            return new MessageStore.MessageMetadata((int) physicOffset, size, topic, cqPos + cqSize);
         }
 
-        public MessageStore.MessageMetadata consumeMessage() {
-            int currentPos = READ_POSITION_UPDATER.get(this);
+        public MessageStore.MessageMetadata consumeMessage(long pullFromThisOffset) {
+            int currentPos = (int)pullFromThisOffset;
             if (currentPos >= wrotePosition) {
                 return null;
             }
             MessageStore.MessageMetadata metadata = getCommitLogMetaFromCq(currentPos);
-            READ_POSITION_UPDATER.addAndGet(this, cqSize);
+            //READ_POSITION_UPDATER.addAndGet(this, cqSize);
             return metadata;
         }
 

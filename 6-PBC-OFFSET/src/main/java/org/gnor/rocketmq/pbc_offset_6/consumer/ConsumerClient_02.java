@@ -62,14 +62,30 @@ public class ConsumerClient_02 {
     }
 
     public void pullMessage() {
+        RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
+        getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
+        getConsumerOffsetCommand.setTopic("Topic-T02");
+        getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+
+        System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
+        channel.writeAndFlush(getConsumerOffsetCommand);
+    }
+
+    private void handleOffsetResponse(ChannelHandlerContext ctx, RemotingCommand response) {
+        long consumeOffset = response.getConsumerOffset();
+
+        // 发送拉取消息请求
         RemotingCommand remotingCommand = new RemotingCommand();
         remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
         remotingCommand.setCode(RemotingCommand.CONSUMER_MSG);
+        remotingCommand.setConsumerGroup("ConsumerGroup-C01");
         remotingCommand.setTopic("Topic-T02");
+        remotingCommand.setConsumerOffset(consumeOffset);
         remotingCommand.setHey("Pull message request from consumer");
 
         System.out.println("发送拉取消息请求: " + remotingCommand.getHey());
-        channel.writeAndFlush(remotingCommand);
+        ctx.writeAndFlush(remotingCommand);
     }
 
     // 客户端处理器
@@ -81,7 +97,11 @@ public class ConsumerClient_02 {
                 System.out.println("收到服务器响应消息: " + msg.getHey() + " [时间: " +
                         LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]");
 
-                ConsumerClient_02.this.pullMessage();
+                if (msg.getCode() == RemotingCommand.QUERY_CONSUMER_OFFSET) {
+                    handleOffsetResponse(ctx, msg);
+                } else {
+                    pullMessage();
+                }
             } else {
                 System.out.println("收到服务器消息: " + msg.getHey());
             }

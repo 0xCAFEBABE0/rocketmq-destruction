@@ -83,7 +83,7 @@ public class ConsumerOffsetManager {
         if (null != offset) {
             return offset;
         }
-        return -1L;
+        return 0L;
     }
 
     //public void commitOffset(final String group, final String topic, final long offset) {

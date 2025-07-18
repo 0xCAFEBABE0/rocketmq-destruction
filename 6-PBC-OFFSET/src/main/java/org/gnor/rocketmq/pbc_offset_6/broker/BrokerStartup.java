@@ -131,7 +131,7 @@ public class BrokerStartup {
                         requestHoldService.notifyMessageArriving(topic);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
-                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
+                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis(), remotingCommand.getConsumerOffset());
                         //todo 可移到RequestHoldService统一管理
                         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
                         List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());

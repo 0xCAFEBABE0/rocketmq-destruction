@@ -10,13 +10,16 @@ import org.gnor.rocketmq.common_1.RemotingCommand;
 public class SuspendRequest {
     private Channel clientChannel;
     private RemotingCommand requestCommand;
+    //v6版本新增
+    private final long pullFromThisOffset;
 
     private long suspendTimestamp;
 
-    public SuspendRequest(Channel clientChannel, RemotingCommand requestCommand, long suspendTimestamp) {
+    public SuspendRequest(Channel clientChannel, RemotingCommand requestCommand, long suspendTimestamp, long pullFromThisOffset) {
         this.clientChannel = clientChannel;
         this.requestCommand = requestCommand;
         this.suspendTimestamp = suspendTimestamp;
+        this.pullFromThisOffset = pullFromThisOffset;
     }
 
     public Channel getClientChannel() {
@@ -41,5 +44,9 @@ public class SuspendRequest {
 
     public void setSuspendTimestamp(long suspendTimestamp) {
         this.suspendTimestamp = suspendTimestamp;
+    }
+
+    public long getPullFromThisOffset() {
+        return pullFromThisOffset;
     }
 }
