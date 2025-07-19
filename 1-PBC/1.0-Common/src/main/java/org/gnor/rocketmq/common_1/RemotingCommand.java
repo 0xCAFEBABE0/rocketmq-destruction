@@ -3,6 +3,8 @@ package org.gnor.rocketmq.common_1;
 import com.alibaba.fastjson2.JSON;
 import io.netty.buffer.ByteBuf;
 
+import java.util.Map;
+
 /**
  * @version 1.0
  * @since 2025/7/2
@@ -12,6 +14,7 @@ public class RemotingCommand {
     private int code = PRODUCER_MSG;
     private String hey;
     private transient byte[] body;
+    private String properties;
 
     /*v3版本新增 */
     private String topic;
@@ -79,6 +82,14 @@ public class RemotingCommand {
 
     public void setConsumerGroup(String consumerGroup) {
         this.consumerGroup = consumerGroup;
+    }
+
+    public String getProperties() {
+        return properties;
+    }
+
+    public void setProperties(String properties) {
+        this.properties = properties;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

@@ -5,8 +5,8 @@
 - (4-PBC-FILE) producer、consumer、broker：改为本地文件存储，修改为rocketmq的消息协议，引入commitLog
 - (5-PBC-CONSUMEQUEUE) broker：引入consumeQueue
 - (6-PBC-OFFSET) consumer、broker：消费进度管理
-- (7-PBC-CONSUMER_THREAD) consumer: 引入消费者线程模型
-- broker：引入tag，增加服务端消息过滤
+- (7-PBC-TAG) broker：引入tag，增加服务端消息过滤
+- consumer: 引入消费者线程模型
 - nameserver：引入nameserver
 - producer、consumer: 引入负载均衡
 - producer、consumer：引入消息重试
