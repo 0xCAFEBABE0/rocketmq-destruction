@@ -16,6 +16,8 @@ public class RemotingCommand {
 
     /*v3版本新增 */
     private String topic;
+    /*v9版本新增 */
+    private int queueId;
 
     /*v6版本新增 */
     private long consumerOffset;
@@ -132,6 +134,13 @@ public class RemotingCommand {
 
     public void setTopicRouteData(TopicRouteData topicRouteData) {
         this.topicRouteData = topicRouteData;
+    }
+    public int getQueueId() {
+        return queueId;
+    }
+
+    public void setQueueId(int queueId) {
+        this.queueId = queueId;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {
