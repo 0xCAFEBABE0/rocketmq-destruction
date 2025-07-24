@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.pbc_file_4.broker;
+package org.gnor.rocketmq.npbc_namesrv_8.namesrv;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -12,47 +12,20 @@ import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import org.gnor.rocketmq.common_1.*;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
-/**
- * @version 1.0
- * @since 2025/7/1
- */
-public class BrokerStartup {
+public class NamesrvStartup {
     private final ServerBootstrap serverBootstrap;
     protected final EventLoopGroup eventLoopGroupSelector;
     protected final EventLoopGroup eventLoopGroupBoss;
-    protected final NettyServerHandler serverHandler;
-
-    /*v2版本新增：消费长轮询机制*/
-    protected final RequestHoldService requestHoldService;
-
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
+    protected final NamesrvNettyServerHandler serverHandler;
+    protected final NamesrvRequestProcessor namesrvRequestProcessor = new NamesrvRequestProcessor();
 
-    /*v3版本新增：本地按topic存储列表*/
-    //private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
-    //public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
-    //    return storeTopicRecord;
-    //}
-
-    /*v4版本新增：本地文件存储*/
-    private MessageStore messageStore;
-
-    public MessageStore getMessageStore() {
-        return messageStore;
-    }
-
-    public BrokerStartup() {
+    public NamesrvStartup() {
         this.serverBootstrap = new ServerBootstrap();
-        this.eventLoopGroupSelector = new NioEventLoopGroup(3, new ThreadFactoryImpl("NettyServerNIOSelector_"));
-        this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactoryImpl("NettyNIOBoss_"));
-        this.serverHandler = new NettyServerHandler();
-
-        this.requestHoldService = new RequestHoldService(this);
-        this.messageStore = new MessageStore();
+        this.eventLoopGroupSelector = new NioEventLoopGroup(3, new ThreadFactoryImpl("Namesrv_NettyServerNIOSelector_"));
+        this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactoryImpl("Namesrv_NettyNIOBoss_"));
+        this.serverHandler = new NamesrvNettyServerHandler();
     }
 
     public void start() {
@@ -60,16 +33,14 @@ public class BrokerStartup {
         try {
             ChannelFuture sync = serverBootstrap.bind().sync();
             InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();
-            System.out.println("Broker started, listening 0.0.0.0:" + addr.getPort());
-
-            new Thread(requestHoldService).start();
+            System.out.println("Namesrv started, listening 0.0.0.0:" + addr.getPort());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
     public static void main(String[] args) {
-        new BrokerStartup().start();
+        new NamesrvStartup().start();
     }
 
     protected void initServerBootstrap(ServerBootstrap serverBootstrap) {
@@ -79,7 +50,7 @@ public class BrokerStartup {
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.SO_KEEPALIVE, false)
                 .childOption(ChannelOption.TCP_NODELAY, true)
-                .localAddress(new InetSocketAddress(Constant.BROKER_IP, Constant.BROKER_PORT))
+                .localAddress(new InetSocketAddress(Constant.BROKER_IP, Constant.NAMESRV_PORT))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
@@ -95,37 +66,26 @@ public class BrokerStartup {
     }
 
     @ChannelHandler.Sharable
-    public class NettyServerHandler extends SimpleChannelInboundHandler<RemotingCommand> {
+    public class NamesrvNettyServerHandler extends SimpleChannelInboundHandler<RemotingCommand> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext channelHandlerContext, RemotingCommand remotingCommand) throws InterruptedException {
-            System.out.println("Received MSG:" + remotingCommand.getHey());
+            System.out.println("Namesrv:Received MSG:" + remotingCommand.getHey());
             if (RemotingCommand.REQUEST_FLAG == remotingCommand.getFlag()) {
 
                 String topic = remotingCommand.getTopic();
                 RemotingCommand response = new RemotingCommand();
                 switch (remotingCommand.getCode()) {
-                    case RemotingCommand.PRODUCER_MSG:
-
-                        messageStore.appendMessage(topic, remotingCommand.getHey());
-                        /*迭代为文件存储*/
-                        //List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
-                        //storeList.add(remotingCommand);
-                        //storeTopicRecord.put(topic, storeList);
-
-                        //storeMSG.add(remotingCommand); //存储消息
+                    case RemotingCommand.REGISTER_BROKER:
+                        namesrvRequestProcessor.registerBroker(
+                                remotingCommand.getBrokerName(),
+                                remotingCommand.getBrokerAddr(),
+                                remotingCommand.getTopic(),
+                                remotingCommand.getTopicQueueNums()
+                        );
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
-                        response.setHey("Response echo!!!!");
+                        response.setHey("Namesrv:Broker registered!");
                         channelHandlerContext.channel().writeAndFlush(response);
-                        requestHoldService.notifyMessageArriving(topic);
-                        break;
-                    case RemotingCommand.CONSUMER_MSG:
-                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
-                        //todo 可移到RequestHoldService统一管理
-                        ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
-                        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
-                        suspendRequestList.add(sr);
-                        suspendRequests.put(topic, suspendRequestList);
                         break;
                     default:
                         break;

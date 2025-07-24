@@ -15,4 +15,5 @@ package org.gnor.rocketmq.common_1;
 public interface Constant {
     static final String BROKER_IP = "127.0.0.1";
     static final int BROKER_PORT = 9011;
+    static final int NAMESRV_PORT = 9091;
 }

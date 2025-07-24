@@ -98,10 +98,7 @@ public class BrokerStartup {
                 RemotingCommand response = new RemotingCommand();
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
-
-                        List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
-                        storeList.add(remotingCommand);
-                        storeTopicRecord.put(topic, storeList);
+                        storeTopicRecord.computeIfAbsent(topic, k -> new ArrayList<>()).add(remotingCommand);
                         //storeMSG.add(remotingCommand); //存储消息
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Response echo!!!!");
@@ -113,9 +110,7 @@ public class BrokerStartup {
                         SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
                         //todo 可移到RequestHoldService统一管理
                         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
-                        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
-                        suspendRequestList.add(sr);
-                        suspendRequests.put(topic, suspendRequestList);
+                        suspendRequests.computeIfAbsent(topic, k -> new ArrayList<>()).add(sr);
                         break;
                     default:
                         break;

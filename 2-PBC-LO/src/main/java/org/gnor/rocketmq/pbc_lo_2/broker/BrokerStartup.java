@@ -31,7 +31,7 @@ public class BrokerStartup {
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
 
     //本地存储列表
-    private static List<RemotingCommand> storeMSG = new ArrayList<>();
+    //private static List<RemotingCommand> storeMSG = new ArrayList<>();
 
     public BrokerStartup() {
         this.serverBootstrap = new ServerBootstrap();
@@ -92,7 +92,7 @@ public class BrokerStartup {
                 RemotingCommand response = new RemotingCommand();
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
-                        storeMSG.add(remotingCommand); //存储消息
+                        //storeMSG.add(remotingCommand); //存储消息
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Response echo!!!!");
                         channelHandlerContext.channel().writeAndFlush(response);

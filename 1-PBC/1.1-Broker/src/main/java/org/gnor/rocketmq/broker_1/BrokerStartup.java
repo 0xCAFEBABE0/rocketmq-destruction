@@ -95,8 +95,7 @@ public class BrokerStartup {
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         String hey = "Message`s empty!";
                         if (!storeMSG.isEmpty()) {
-                            hey = storeMSG.get(0).getHey();
-                            storeMSG.remove(0);
+                            hey = storeMSG.remove(0).getHey();
                         }
                         response.setHey(hey);
                         channelHandlerContext.channel().writeAndFlush(response);

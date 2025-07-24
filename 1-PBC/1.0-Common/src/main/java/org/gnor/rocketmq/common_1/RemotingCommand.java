@@ -3,8 +3,6 @@ package org.gnor.rocketmq.common_1;
 import com.alibaba.fastjson2.JSON;
 import io.netty.buffer.ByteBuf;
 
-import java.util.Map;
-
 /**
  * @version 1.0
  * @since 2025/7/2
@@ -23,6 +21,11 @@ public class RemotingCommand {
     private long consumerOffset;
     private String consumerGroup;
 
+    /*v8版本新增 namesrv*/
+    private String brokerName;
+    private String brokerAddr;
+    private int topicQueueNums;
+
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
 
@@ -31,6 +34,25 @@ public class RemotingCommand {
     public static final int CONSUMER_MSG = 102;
 
     public static final int QUERY_CONSUMER_OFFSET = 201;
+
+    public static final int GET_ROUTEINFO_BY_TOPIC = 105;
+    public static final int REGISTER_BROKER = 103;
+    public static final int UNREGISTER_BROKER = 104;
+
+    public static final int BROKER_HEARTBEAT = 904;
+
+
+    public void setBrokerName(String brokerName) {
+        this.brokerName = brokerName;
+    }
+
+    public void setBrokerAddr(String brokerAddr) {
+        this.brokerAddr = brokerAddr;
+    }
+
+    public void setTopicQueueNums(int topicQueueNums) {
+        this.topicQueueNums = topicQueueNums;
+    }
 
     public String getHey() {
         return hey;
@@ -90,6 +112,18 @@ public class RemotingCommand {
 
     public void setProperties(String properties) {
         this.properties = properties;
+    }
+
+    public String getBrokerName() {
+        return brokerName;
+    }
+
+    public String getBrokerAddr() {
+        return brokerAddr;
+    }
+
+    public int getTopicQueueNums() {
+        return topicQueueNums;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

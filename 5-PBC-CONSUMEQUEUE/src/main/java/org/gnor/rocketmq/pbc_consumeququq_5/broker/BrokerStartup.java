@@ -34,10 +34,10 @@ public class BrokerStartup {
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
 
     /*v3版本新增：本地按topic存储列表*/
-    private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
-    public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
-        return storeTopicRecord;
-    }
+    //private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
+    //public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
+    //    return storeTopicRecord;
+    //}
 
     /*v4版本新增：本地文件存储*/
     private MessageStore messageStore;

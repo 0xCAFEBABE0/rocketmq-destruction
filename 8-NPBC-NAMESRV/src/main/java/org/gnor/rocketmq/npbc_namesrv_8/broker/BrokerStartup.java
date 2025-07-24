@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.pbc_file_4.broker;
+package org.gnor.rocketmq.npbc_namesrv_8.broker;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -10,12 +10,12 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import org.gnor.rocketmq.common_1.*;
+import org.gnor.rocketmq.npbc_namesrv_8.remoting.NettyRemotingClient;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.*;
 
 /**
  * @version 1.0
@@ -33,13 +33,20 @@ public class BrokerStartup {
     protected final NettyConnectManageHandler connectionManageHandler = new NettyConnectManageHandler();
 
     /*v3版本新增：本地按topic存储列表*/
-    //private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
-    //public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
-    //    return storeTopicRecord;
-    //}
+    private final ConcurrentMap<String /*topic*/, List<RemotingCommand>> storeTopicRecord = new ConcurrentHashMap<>();
+    public ConcurrentMap<String /*topic*/, List<RemotingCommand>> getStoreTopicRecord() {
+        return storeTopicRecord;
+    }
 
     /*v4版本新增：本地文件存储*/
     private MessageStore messageStore;
+
+    /*v6版本新增：消费进度管理*/
+    private ConsumerOffsetManager consumerOffsetManager;
+    protected ScheduledExecutorService scheduledExecutorService;
+
+    /*v8版本新增：namesrv客户端*/
+    private NettyRemotingClient remotingClient = new NettyRemotingClient();
 
     public MessageStore getMessageStore() {
         return messageStore;
@@ -52,11 +59,33 @@ public class BrokerStartup {
         this.serverHandler = new NettyServerHandler();
 
         this.requestHoldService = new RequestHoldService(this);
-        this.messageStore = new MessageStore();
+        this.consumerOffsetManager = new ConsumerOffsetManager();
+        this.messageStore = new MessageStore(consumerOffsetManager);
+        this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumerOffsetPersistService"));
     }
 
     public void start() {
+        this.consumerOffsetManager.load();
+
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            this.consumerOffsetManager.persist();
+        }, 1000 * 10, 1000 * 5, TimeUnit.MILLISECONDS);
         initServerBootstrap(serverBootstrap);
+
+        RemotingCommand remotingCommand = new RemotingCommand();
+        remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        remotingCommand.setCode(RemotingCommand.REGISTER_BROKER);
+        remotingCommand.setBrokerName("Broker-01");
+        remotingCommand.setBrokerAddr("127.0.0.1:9011");
+        remotingCommand.setTopic("Topic-T01");
+        remotingCommand.setTopicQueueNums(4);
+        try {
+            RemotingCommand responseCmd = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+            System.out.println(responseCmd.getHey());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         try {
             ChannelFuture sync = serverBootstrap.bind().sync();
             InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();
@@ -107,7 +136,7 @@ public class BrokerStartup {
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
 
-                        messageStore.appendMessage(topic, remotingCommand.getHey());
+                        messageStore.appendMessage(topic, remotingCommand.getHey(), remotingCommand.getProperties());
                         /*迭代为文件存储*/
                         //List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
                         //storeList.add(remotingCommand);
@@ -120,12 +149,19 @@ public class BrokerStartup {
                         requestHoldService.notifyMessageArriving(topic);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
-                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis());
+                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis(), remotingCommand.getConsumerOffset());
                         //todo 可移到RequestHoldService统一管理
                         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
                         List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
                         suspendRequestList.add(sr);
                         suspendRequests.put(topic, suspendRequestList);
+                        break;
+                    case RemotingCommand.QUERY_CONSUMER_OFFSET:
+                        long offset = consumerOffsetManager.queryOffset(remotingCommand.getTopic());
+                        response.setConsumerOffset(offset);
+                        response.setFlag(RemotingCommand.RESPONSE_FLAG);
+                        response.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
+                        channelHandlerContext.channel().writeAndFlush(response);
                         break;
                     default:
                         break;
