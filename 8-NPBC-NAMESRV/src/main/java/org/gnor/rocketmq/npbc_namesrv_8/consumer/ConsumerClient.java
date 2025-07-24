@@ -7,10 +7,12 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.gnor.rocketmq.common_1.*;
+import org.gnor.rocketmq.npbc_namesrv_8.remoting.NettyRemotingClient;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -18,117 +20,61 @@ public class ConsumerClient {
     private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumerKeepingService"));
     private Channel channel = null;
     private volatile boolean isRunning = false;
+    private NettyRemotingClient remotingClient = new NettyRemotingClient();
 
     public static void main(String[] args) throws Exception {
         new ConsumerClient().run();
     }
 
     public void run() throws Exception {
-        String host = Constant.BROKER_IP;
-        int port = Constant.BROKER_PORT;
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        while (true)  {
+            RemotingCommand remotingCommand = new RemotingCommand();
+            remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+            remotingCommand.setCode(RemotingCommand.GET_ROUTEINFO_BY_TOPIC);
+            remotingCommand.setTopic("Topic-T01");
+            remotingCommand.setHey("Query topic route info from namesrv");
 
-        try {
-            Bootstrap b = new Bootstrap();
-            b.group(workerGroup)
-                    .channel(NioSocketChannel.class) // 使用NIO传输Channel
-                    .option(ChannelOption.SO_KEEPALIVE, false) // 保持连接
-                    .handler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel ch) {
-                            ch.pipeline()
-                                    .addLast(
-                                            new NettyEncoder(),
-                                            new NettyDecoder()
-                                    )
-                                    .addLast(new ClientHandler());
-                        }
-                    });
+            RemotingCommand queryTopicFromNamesrv = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+            TopicRouteData topicRouteData = queryTopicFromNamesrv.getTopicRouteData();
 
-            // 连接服务器
-            ChannelFuture f = b.connect(host, port).sync();
-            this.channel = f.channel();
-            this.isRunning = true;
-            System.out.println("已连接到服务器: " + host + ":" + port);
-            //startScheduledPullMessage();
-            pullMessage();
-            // 等待连接关闭
-            f.channel().closeFuture().sync();
-        } finally {
-            this.isRunning = false;
-            if (scheduledExecutorService != null && !scheduledExecutorService.isShutdown()) {
-                scheduledExecutorService.shutdown();
-            }
-            workerGroup.shutdownGracefully();
-        }
-    }
+            String topic = topicRouteData.getTopic();
+            Map<String, String> brokerAddrTable = topicRouteData.getBrokerAddrTable();
+            Map<String, Integer> queueTable = topicRouteData.getQueueTable();
 
-    public void pullMessage() {
-        RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
-        getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
-        getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
-        getConsumerOffsetCommand.setTopic("Topic-T01");
-        getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+            //取第一个value
+            String brokerAddr = brokerAddrTable.values().iterator().next();
+            RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
+            getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+            getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
+            getConsumerOffsetCommand.setTopic("Topic-T01");
+            getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
 
-        System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
-        channel.writeAndFlush(getConsumerOffsetCommand);
-    }
+            System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
+            RemotingCommand offsetCmd = this.remotingClient.invokeSync(brokerAddr, getConsumerOffsetCommand, 30000L);
 
-    private void handleOffsetResponse(ChannelHandlerContext ctx, RemotingCommand response) {
-        long consumeOffset = response.getConsumerOffset();
 
-        // 发送拉取消息请求
-        RemotingCommand remotingCommand = new RemotingCommand();
-        remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
-        remotingCommand.setCode(RemotingCommand.CONSUMER_MSG);
-        remotingCommand.setConsumerGroup("ConsumerGroup-C01");
-        remotingCommand.setTopic("Topic-T01");
-        remotingCommand.setConsumerOffset(consumeOffset);
-        remotingCommand.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
-            put("TAG", "TAG-A");
-        }}));
-        remotingCommand.setHey("Pull message request from consumer");
+            // 发送拉取消息请求
+            long consumeOffset = offsetCmd.getConsumerOffset();
+            RemotingCommand consumerCmd = new RemotingCommand();
+            consumerCmd.setFlag(RemotingCommand.REQUEST_FLAG);
+            consumerCmd.setCode(RemotingCommand.CONSUMER_MSG);
+            consumerCmd.setConsumerGroup("ConsumerGroup-C01");
+            consumerCmd.setTopic("Topic-T01");
+            consumerCmd.setConsumerOffset(consumeOffset);
+            consumerCmd.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
+                put("TAG", "TAG-A");
+            }}));
+            consumerCmd.setHey("Pull message request from consumer");
+            System.out.println("发送拉取消息请求: " + consumerCmd.getHey());
+            RemotingCommand consumerRsp = this.remotingClient.invokeSync(brokerAddr, consumerCmd, 30000L);
 
-        System.out.println("发送拉取消息请求: " + remotingCommand.getHey());
-        ctx.writeAndFlush(remotingCommand);
-    }
-
-    // 客户端处理器
-    public class ClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
-        @Override
-        protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) {
             // 读取服务器发送的消息
-            if (msg.getFlag() == RemotingCommand.RESPONSE_FLAG) {
-                System.out.println("收到服务器响应消息: " + msg.getHey() + " [时间: " +
+            if (consumerRsp.getFlag() == RemotingCommand.RESPONSE_FLAG) {
+                System.out.println("收到服务器响应消息: " + consumerRsp.getHey() + " [时间: " +
                         LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]");
-
-                if (msg.getCode() == RemotingCommand.QUERY_CONSUMER_OFFSET) {
-                    handleOffsetResponse(ctx, msg);
-                } else {
-                    ConsumerClient.this.pullMessage();
-                }
             } else {
-                System.out.println("收到服务器消息: " + msg.getHey());
+                System.out.println("收到服务器消息: " + consumerRsp.getHey());
             }
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) throws Exception {
-            System.out.println("连接已激活，开始定时拉取消息...");
-            super.channelActive(ctx);
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            System.out.println("连接已断开");
-            super.channelInactive(ctx);
-        }
-
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            // 异常处理
-            System.err.println("连接异常: " + cause.getMessage());
-            ctx.close();
         }
     }
 

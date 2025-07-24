@@ -87,6 +87,12 @@ public class NamesrvStartup {
                         response.setHey("Namesrv:Broker registered!");
                         channelHandlerContext.channel().writeAndFlush(response);
                         break;
+                    case RemotingCommand.GET_ROUTEINFO_BY_TOPIC:
+                        TopicRouteData topicRouteData = namesrvRequestProcessor.getTopicRouteData(topic);
+                        response.setFlag(RemotingCommand.RESPONSE_FLAG);
+                        response.setTopicRouteData(topicRouteData);
+                        channelHandlerContext.channel().writeAndFlush(response);
+                        break;
                     default:
                         break;
                 }

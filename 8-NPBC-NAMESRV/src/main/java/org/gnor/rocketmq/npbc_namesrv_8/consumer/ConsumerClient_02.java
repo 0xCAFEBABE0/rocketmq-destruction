@@ -86,7 +86,7 @@ public class ConsumerClient_02 {
         remotingCommand.setConsumerOffset(consumeOffset);
         remotingCommand.setHey("Pull message request from consumer");
         remotingCommand.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
-            put("TAG", "TAG-B");
+            put("TAG", "TAG-A");
         }}));
 
         System.out.println("发送拉取消息请求: " + remotingCommand.getHey());

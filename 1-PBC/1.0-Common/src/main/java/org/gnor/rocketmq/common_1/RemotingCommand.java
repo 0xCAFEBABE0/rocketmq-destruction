@@ -25,6 +25,7 @@ public class RemotingCommand {
     private String brokerName;
     private String brokerAddr;
     private int topicQueueNums;
+    private TopicRouteData topicRouteData;
 
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
@@ -124,6 +125,13 @@ public class RemotingCommand {
 
     public int getTopicQueueNums() {
         return topicQueueNums;
+    }
+    public TopicRouteData getTopicRouteData() {
+        return topicRouteData;
+    }
+
+    public void setTopicRouteData(TopicRouteData topicRouteData) {
+        this.topicRouteData = topicRouteData;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {
