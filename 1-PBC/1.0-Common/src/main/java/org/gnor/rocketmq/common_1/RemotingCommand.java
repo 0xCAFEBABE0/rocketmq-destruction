@@ -29,6 +29,9 @@ public class RemotingCommand {
     private int topicQueueNums;
     private TopicRouteData topicRouteData;
 
+    /*v11版本新增*/
+    private String clientId;
+
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
 
@@ -43,6 +46,10 @@ public class RemotingCommand {
     public static final int UNREGISTER_BROKER = 104;
 
     public static final int BROKER_HEARTBEAT = 904;
+
+    /*v11版本新增*/
+    public static final int GET_CONSUMER_LIST_BY_GROUP = 38;
+    public static final int HEART_BEAT = 34;
 
 
     public void setBrokerName(String brokerName) {
@@ -141,6 +148,14 @@ public class RemotingCommand {
 
     public void setQueueId(int queueId) {
         this.queueId = queueId;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

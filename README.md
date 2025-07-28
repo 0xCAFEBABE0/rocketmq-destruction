@@ -10,8 +10,7 @@
 - (9-NPBC-QUEUEID) consumer: 改造为queueId
 - (10-NPBC-CONSUMERMODEL) consumer: 引入消费者线程模型
 
-- consumer：引入重平衡机制
-- producer、consumer: 引入负载均衡
+- (11-NPBC-LB)producer、consumer: 引入负载均衡、重平衡机制
 - producer、consumer：引入消息重试
 - broker：实现事务消息
 - broker：实现延时消息
