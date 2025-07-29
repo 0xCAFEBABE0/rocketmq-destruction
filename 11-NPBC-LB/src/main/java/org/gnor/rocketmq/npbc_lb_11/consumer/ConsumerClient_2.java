@@ -23,6 +23,7 @@ public class ConsumerClient_2 {
     }
 
     public void run() throws Exception {
+        pullMessageService.sendHeartbeatToBroker();
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 pullMessageService.sendHeartbeatToBroker();

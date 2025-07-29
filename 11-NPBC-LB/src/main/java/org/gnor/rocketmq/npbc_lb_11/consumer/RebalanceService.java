@@ -15,6 +15,8 @@ public class RebalanceService implements Runnable {
 
     private final ConcurrentMap<String /*topic*/, List<MessageQueue>> topicSubscribeInfoTable = new ConcurrentHashMap<>();
 
+    protected final ConcurrentMap<MessageQueue, PullRequest> processQueueTable = new ConcurrentHashMap<>(64);
+
     public RebalanceService(PullMessageService pullMessageService) {
         this.pullMessageService = pullMessageService;
     }
@@ -37,9 +39,9 @@ public class RebalanceService implements Runnable {
     }
 
     public boolean doRebalance() {
-        List<Object> res = new ArrayList<>();
-        topicSubscribeInfoTable.forEach((k, mqList) -> {
-            List<String> cidAll = this.getConsumerIdList(k);
+        List<MessageQueue> allocateResult = new ArrayList<>();
+        topicSubscribeInfoTable.forEach((topic, mqList) -> {
+            List<String> cidAll = this.getConsumerIdList(topic);
             Collections.sort(cidAll);
             //Collections.sort(mqList);
             String currentCID = buildMQClientId();
@@ -52,13 +54,72 @@ public class RebalanceService implements Runnable {
             int startIndex = (mod > 0 && index < mod) ? index * averageSize : index * averageSize + mod;
             int range = Math.min(averageSize, mqList.size() - startIndex);
             for (int i = 0; i< range; ++i) {
-                res.add(mqList.get((startIndex + i) & mqList.size()));
+                allocateResult.add(mqList.get(startIndex + i));
             }
+
+            System.out.println("RebalanceService doRebalance " + JSONObject.toJSONString(allocateResult));
+
+            // drop process queues no longer belong me
+            HashMap<MessageQueue, PullRequest> removeQueueMap = new HashMap<>(this.processQueueTable.size());
+            Iterator<Map.Entry<MessageQueue, PullRequest>> it = this.processQueueTable.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<MessageQueue, PullRequest> next = it.next();
+                MessageQueue mq = next.getKey();
+                PullRequest pq = next.getValue();
+
+                if (mq.getTopic().equals(topic)) {
+                    if (!allocateResult.contains(mq)) {
+                        pq.setDropped(true);
+                        removeQueueMap.put(mq, pq);
+                    }
+                }
+            }
+            // remove message queues no longer belong me
+            for (Map.Entry<MessageQueue, PullRequest> entry : removeQueueMap.entrySet()) {
+                MessageQueue mq = entry.getKey();
+                PullRequest pq = entry.getValue();
+                //if (this.removeUnnecessaryMessageQueue(mq, pq)) {
+                //    this.processQueueTable.remove(mq);
+                //}
+                this.processQueueTable.remove(mq);
+            }
+
+            // add new message queue
+            boolean allMQLocked = true;
+            List<PullRequest> pullRequestList = new ArrayList<>();
+            for (MessageQueue mq : mqList) {
+                if (!this.processQueueTable.containsKey(mq) && !removeQueueMap.containsKey(mq)) {
+                    //if (needLockMq && !this.lock(mq)) {
+                    //    System.out.println("doRebalance, add a new mq failed, {}, because lock failed" + mq);
+                    //    allMQLocked = false;
+                    //    continue;
+                    //}
+                    //
+                    //this.removeDirtyOffset(mq);
+                    //ProcessQueue pq = createProcessQueue();
+                    //pq.setLocked(true);
+                    //long nextOffset = this.computePullFromWhere(mq);
+                    //if (nextOffset >= 0) {
+                    PullRequest pq = new PullRequest();
+                    PullRequest pre = this.processQueueTable.putIfAbsent(mq, pq);
+                    if (pre != null) {
+                        System.out.println("doRebalance, add a new mq failed, {}, because mq already exists" + mq);
+                    } else {
+                        System.out.println("doRebalance, add a new mq, " + mq);
+                        PullRequest pullRequest = new PullRequest();
+                        pullRequest.setTopic(mq.getTopic());
+                        pullRequest.setBrokerName(mq.getBrokerName());
+                        pullRequest.setQueueId(mq.getQueueId());
+                        pullRequestList.add(pullRequest);
+                    }
+                    //} else {
+                    //    System.out.println("doRebalance, add new mq failed, {}" + mq);
+                    //}
+                }
+            }
+            pullRequestList.forEach(pullMessageService::executePullRequest);
         });
-
-        System.out.println("RebalanceService doRebalance " + JSONObject.toJSONString(res));
         return true;
-
     }
 
     public List<String> getConsumerIdList(String topic) {

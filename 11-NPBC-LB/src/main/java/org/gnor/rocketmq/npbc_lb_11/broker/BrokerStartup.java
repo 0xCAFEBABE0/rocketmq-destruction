@@ -51,6 +51,7 @@ public class BrokerStartup {
 
     /*v11版本新增：重平衡*/
     private ConsumerManager consumerManager = new ConsumerManager();
+    private ScheduledExecutorService clientHousekeepingService= Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumerManagerService"));
 
     public MessageStore getMessageStore() {
         return messageStore;
@@ -75,6 +76,12 @@ public class BrokerStartup {
             this.consumerOffsetManager.persist();
         }, 1000 * 10, 1000 * 5, TimeUnit.MILLISECONDS);
         initServerBootstrap(serverBootstrap);
+
+
+        clientHousekeepingService.scheduleAtFixedRate(() -> {
+            this.consumerManager.scanNotActivateChannel();
+        }, 1000, 10_000, TimeUnit.MILLISECONDS);
+
 
         RemotingCommand remotingCommand = new RemotingCommand();
         remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);

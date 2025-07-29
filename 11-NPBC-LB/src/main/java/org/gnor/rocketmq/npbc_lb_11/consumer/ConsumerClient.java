@@ -22,6 +22,7 @@ public class ConsumerClient {
     }
 
     public void run() throws Exception {
+        pullMessageService.sendHeartbeatToBroker();
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 pullMessageService.sendHeartbeatToBroker();
@@ -36,7 +37,7 @@ public class ConsumerClient {
         Map<String, Integer> queueTable = topicRouteData.getQueueTable();
 
         queueTable.forEach((k, v) -> {
-            for (Integer i = 0; i < v; ++i) {
+            for (int i = 0; i < v; ++i) {
                 PullRequest pullRequest = new PullRequest();
                 pullRequest.setTopic(topic);
                 pullRequest.setBrokerName(k);

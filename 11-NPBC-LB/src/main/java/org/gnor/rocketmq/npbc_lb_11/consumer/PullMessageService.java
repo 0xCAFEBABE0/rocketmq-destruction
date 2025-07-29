@@ -62,6 +62,11 @@ public class PullMessageService implements Runnable {
     }
 
     public void pullMessage(PullRequest pullRequest) throws InterruptedException {
+        if (pullRequest.isDropped()) {
+            System.out.println("PullRequest is dropped, skip it");
+            return;
+        }
+
         try {
             String brokerName = pullRequest.getBrokerName();
             String brokerAddr = brokerAddrTable.get(brokerName);

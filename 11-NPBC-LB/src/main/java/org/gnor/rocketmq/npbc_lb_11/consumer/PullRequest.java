@@ -9,6 +9,8 @@ public class PullRequest {
     private String brokerName;
     private int queueId;
 
+    private boolean dropped;
+
     private TreeMap<Long /* queueOffset */, RemotingCommand> msgTreeMap = new TreeMap<>();
     private long nextOffset;
 
@@ -50,5 +52,12 @@ public class PullRequest {
 
     public void setNextOffset(long nextOffset) {
         this.nextOffset = nextOffset;
+    }
+    public boolean isDropped() {
+        return dropped;
+    }
+
+    public void setDropped(boolean dropped) {
+        this.dropped = dropped;
     }
 }
