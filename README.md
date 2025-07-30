@@ -34,6 +34,7 @@
 消息中间件的设计，围绕两个核心问题展开
 - 存储的可靠性
 - 投递的可靠性
+保证at-least-once语义
 
 ### 1-PBC
 服务端：
@@ -63,3 +64,21 @@
 移除storeTopicRecord本地存储，引入MessageStore使用MappedByteBuffer映射commitLog文件，由于所有topic混合存入commitLog，且不存储消费进度，需要引入topicMessageIndex，存储topic下的消费进度，生产一条消息插入一个进度元素。
 提供三个方法，存储消息appendMessage, 消费消息consumeMessage，查询topic下是否有消息 hasMessage
 ![img.png](doc/evolution/evo_04.png)
+
+### 5-PBC-CONSUMEQUEUE
+- 移除topicMessageIndex，引入ConsumeQueueStore按topic分别存储消息索引。且通过cq的已读已写指针，判断是否存在新消息到达。
+消费进度通过cq的读写指针位置判断，重启则丢失指针位置，造成消息丢失
+hasMessage改为由ConsumeQueueStore提供
+![img.png](doc/evolution/evo_05.png)
+
+### 6-PBC-OFFSET
+- 移除cq读位置指针，引入ConsumerOffsetManager管理消费进度，对应consumerOffset.json文件，服务中映射为map，定时同步回文件。
+co按topic写入对应cqPosition，并提供接口供consumer查询，拉取消息时，带上cqPosition
+![img.png](doc/evolution/evo_06.png)
+
+### 7-PBC-TAG
+- 在消息体的properties中新增tag，提供更细维度的管理，避免topic急剧膨胀
+cq结构中新增8字节的tagCode，co还是保持topic结构，若cq未找到还是正常推进进度。
+存在订阅同一个topic，不同tag，共享了一份消费进度问题。
+
+

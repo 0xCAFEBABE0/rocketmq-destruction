@@ -1,5 +1,6 @@
 package org.gnor.rocketmq.pbc_offset_6.broker;
 
+import com.sun.xml.internal.ws.api.message.MessageMetadata;
 import org.gnor.rocketmq.pbc_offset_6.broker.ConsumeQueueStore;
 
 import java.io.File;
@@ -33,7 +34,7 @@ public class MessageStore {
 
     //TEMP-> Track message metadata for each topic
     //private final ConcurrentMap<String /*topic*/, List<MessageMetadata>> topicMessageIndex = new ConcurrentHashMap<>();
-
+    /*v6 */
     private ConsumerOffsetManager consumerOffsetManager;
 
     // Message metadata class to track position and size
