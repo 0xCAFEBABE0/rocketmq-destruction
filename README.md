@@ -30,3 +30,36 @@
 - broker: Implement transaction messages.
 - broker: Implement delay messages.
 - broker: Introducing message compression.
+
+消息中间件的设计，围绕两个核心问题展开
+- 存储的可靠性
+- 投递的可靠性
+
+### 1-PBC
+服务端：
+- 消息存储在本地内存，故障易丢失；
+- 为了保证消费实时性，消费轮询的频次足够密，服务端产生太多无用功；
+- 所有的消息杂糅在一起，维护成本高；
+- 无水平扩展能力，应对大批量的消息生产与消费时，无法提供低延时、高可靠的服务能力；
+
+客户端：
+- 最终需要寄生在服务内部，消费采用定时轮询，消耗太多宿主资源
+- 单线程串行生产与消费，面对大批量消息，延时高资源消耗大
+- 消费时全量拉取，无法区分仅业务所需的消息
+![img.png](doc/evolution/evo_01.png)
+
+### 2-PBC-LO
+- 引入长轮询机制，解决大量无用功问题。
+需要引入通报消息到达的机制（RequestHoldService），在两种情境下触发，1.定时轮询hold住的请求 2.产生消息时；底层都调用notifyMessageArriving方法，消费请求到达时，在SuspendRequest里塞入channel。
+![img.png](doc/evolution/evo_02.png)
+
+### 3-PBC-TOPIC
+- 引入topic维度进行消息分类，方便维护消息
+移除storeMSG（List），使用key为topic的storeTopicRecord存储消息。
+![img.png](doc/evolution/evo_03.png)
+
+### 4-PBC-FILE
+- 引入本地文件存储消息，解决消息无法持久化的问题
+移除storeTopicRecord本地存储，引入MessageStore使用MappedByteBuffer映射commitLog文件，由于所有topic混合存入commitLog，且不存储消费进度，需要引入topicMessageIndex，存储topic下的消费进度，生产一条消息插入一个进度元素。
+提供三个方法，存储消息appendMessage, 消费消息consumeMessage，查询topic下是否有消息 hasMessage
+![img.png](doc/evolution/evo_04.png)
