@@ -60,13 +60,13 @@ public class ProducerClient {
         }}));
         this.remotingClient.invokeSync(brokerAddr, remotingCommand, 30000L);
 
-        remotingCommand.setTopic("Topic-T02");
-        remotingCommand.setHey("Hello, Producer-02 Server!");
-        remotingCommand.setQueueId(queueId);
-        remotingCommand.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
-            put("TAG", "TAG-A");
-        }}));
-        this.remotingClient.invokeSync(brokerAddr, remotingCommand, 30000L);
+        //remotingCommand.setTopic("Topic-T02");
+        //remotingCommand.setHey("Hello, Producer-02 Server!");
+        //remotingCommand.setQueueId(queueId);
+        //remotingCommand.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
+        //    put("TAG", "TAG-A");
+        //}}));
+        //this.remotingClient.invokeSync(brokerAddr, remotingCommand, 30000L);
     }
 
     public class MessageQueue {

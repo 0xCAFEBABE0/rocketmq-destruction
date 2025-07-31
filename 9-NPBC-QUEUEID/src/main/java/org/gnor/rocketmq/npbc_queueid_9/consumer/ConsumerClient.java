@@ -45,6 +45,7 @@ public class ConsumerClient {
             getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
             getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
             getConsumerOffsetCommand.setTopic("Topic-T01");
+            getConsumerOffsetCommand.setQueueId(0);
             getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
 
             System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
@@ -58,6 +59,7 @@ public class ConsumerClient {
             consumerCmd.setCode(RemotingCommand.CONSUMER_MSG);
             consumerCmd.setConsumerGroup("ConsumerGroup-C01");
             consumerCmd.setTopic("Topic-T01");
+            getConsumerOffsetCommand.setQueueId(0);
             consumerCmd.setConsumerOffset(consumeOffset);
             consumerCmd.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
                 put("TAG", "TAG-A");

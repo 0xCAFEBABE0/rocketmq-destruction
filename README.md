@@ -81,4 +81,11 @@ co按topic写入对应cqPosition，并提供接口供consumer查询，拉取消�
 cq结构中新增8字节的tagCode，co还是保持topic结构，若cq未找到还是正常推进进度。
 存在订阅同一个topic，不同tag，共享了一份消费进度问题。
 
+### 8-NPBC-NAMESRV
+- 引入namesrv使用brokerAddrTable和topicQueueTable管理broker注册请求，并在consumer定位请求哪个broker时返回
+![img.png](doc/evolution/evo_08.png)
 
+### 9-NPBC-QUEUEID
+- broker端引入queueId，提高横向扩展能力。
+commitLog新增queueId存入文件，cq按queueId进行二级分组，一级依旧为topic
+![img.png](doc/evolution/evo_09.png)

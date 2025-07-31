@@ -3,6 +3,8 @@ package org.gnor.rocketmq.common_1;
 import com.alibaba.fastjson2.JSON;
 import io.netty.buffer.ByteBuf;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * @version 1.0
  * @since 2025/7/2
@@ -31,6 +33,10 @@ public class RemotingCommand {
 
     /*v11版本新增*/
     private String clientId;
+
+    /*release_1版本新增*/
+    private static final AtomicInteger requestId = new AtomicInteger(0);
+    private int opaque = requestId.getAndIncrement();
 
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
@@ -156,6 +162,14 @@ public class RemotingCommand {
 
     public void setClientId(String clientId) {
         this.clientId = clientId;
+    }
+
+    public int getOpaque() {
+        return opaque;
+    }
+
+    public void setOpaque(int opaque) {
+        this.opaque = opaque;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

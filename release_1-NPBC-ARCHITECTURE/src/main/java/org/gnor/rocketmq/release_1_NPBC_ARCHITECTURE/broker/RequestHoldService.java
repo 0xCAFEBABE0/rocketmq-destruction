@@ -65,6 +65,7 @@ public class RequestHoldService implements Runnable {
                 RemotingCommand msgNotFound = new RemotingCommand();
                 msgNotFound.setHey("Message not found!");
                 msgNotFound.setFlag(RemotingCommand.RESPONSE_FLAG);
+                msgNotFound.setOpaque(sr.getOpaque());
                 sr.getClientChannel().writeAndFlush(msgNotFound);
                 it.remove();
             } else if (hasMessages) {
@@ -78,6 +79,7 @@ public class RequestHoldService implements Runnable {
                     continue;
                 }
                 RemotingCommand msgArrivingCmd = new RemotingCommand();
+                msgArrivingCmd.setOpaque(sr.getOpaque());
                 if ("NO_MATCHED_MESSAGE".equals(storedMessage.getStatus())) {
                     msgArrivingCmd.setHey("NO_MATCHED_MESSAGE");
                     msgArrivingCmd.setTopic(storedMessage.getTopic());

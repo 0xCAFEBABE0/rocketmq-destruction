@@ -15,6 +15,8 @@ import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.client.ConsumerManag
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.NettyRemotingClient;
 
 import java.net.InetSocketAddress;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -144,6 +146,7 @@ public class BrokerStartup {
 
                 String topic = remotingCommand.getTopic();
                 RemotingCommand response = new RemotingCommand();
+                response.setOpaque(remotingCommand.getOpaque());
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.PRODUCER_MSG:
 
@@ -160,7 +163,8 @@ public class BrokerStartup {
                         requestHoldService.notifyMessageArriving(topic);
                         break;
                     case RemotingCommand.CONSUMER_MSG:
-                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis(), remotingCommand.getConsumerOffset(), remotingCommand.getQueueId());
+                        SuspendRequest sr = new SuspendRequest(channelHandlerContext.channel(), remotingCommand, System.currentTimeMillis(),
+                                remotingCommand.getConsumerOffset(), remotingCommand.getQueueId(), remotingCommand.getOpaque());
                         //todo 可移到RequestHoldService统一管理
                         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = requestHoldService.getSuspendRequests();
                         List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
@@ -177,6 +181,7 @@ public class BrokerStartup {
                     case RemotingCommand.HEART_BEAT:
                         Map<String, String> propMap = JSONObject.parseObject(remotingCommand.getProperties(), Map.class);
                         String tag = null != propMap && propMap.containsKey("TAG") ? propMap.get("TAG") : "";
+                        System.out.println("HEART_BEAT: " + remotingCommand.getClientId() + " " + remotingCommand.getTopic() + " " + tag + ": " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         consumerManager.registerConsumer(remotingCommand.getClientId(), channelHandlerContext.channel(), remotingCommand.getTopic(), Collections.singleton(tag));
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
                         response.setHey("Broker registered!");

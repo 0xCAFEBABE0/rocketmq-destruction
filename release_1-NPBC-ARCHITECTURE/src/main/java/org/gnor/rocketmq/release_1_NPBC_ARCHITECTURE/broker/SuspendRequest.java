@@ -16,19 +16,23 @@ public class SuspendRequest {
     private final int queueId;
 
     private long suspendTimestamp;
+    //release-1
+    private int opaque;
 
     public SuspendRequest(
             Channel clientChannel,
             RemotingCommand requestCommand,
             long suspendTimestamp,
             long pullFromThisOffset,
-            int queueId
+            int queueId,
+            int opaque
     ) {
         this.clientChannel = clientChannel;
         this.requestCommand = requestCommand;
         this.suspendTimestamp = suspendTimestamp;
         this.pullFromThisOffset = pullFromThisOffset;
         this.queueId = queueId;
+        this.opaque = opaque;
     }
 
     public Channel getClientChannel() {
@@ -63,4 +67,11 @@ public class SuspendRequest {
         return queueId;
     }
 
+    public int getOpaque() {
+        return opaque;
+    }
+
+    public void setOpaque(int opaque) {
+        this.opaque = opaque;
+    }
 }

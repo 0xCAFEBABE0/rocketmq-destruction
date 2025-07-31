@@ -75,6 +75,7 @@ public class NamesrvStartup {
 
                 String topic = remotingCommand.getTopic();
                 RemotingCommand response = new RemotingCommand();
+                response.setOpaque(remotingCommand.getOpaque());
                 switch (remotingCommand.getCode()) {
                     case RemotingCommand.REGISTER_BROKER:
                         namesrvRequestProcessor.registerBroker(

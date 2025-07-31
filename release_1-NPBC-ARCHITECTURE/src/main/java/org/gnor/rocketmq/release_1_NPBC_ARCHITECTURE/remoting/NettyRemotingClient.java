@@ -7,15 +7,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.*;
+import io.netty.util.TimerTask;
 import org.gnor.rocketmq.common_1.NettyDecoder;
 import org.gnor.rocketmq.common_1.NettyEncoder;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.common_1.ThreadFactoryImpl;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -25,29 +23,33 @@ public class NettyRemotingClient {
     private Bootstrap bootstrap;
 
     private final ConcurrentMap<String /* addr */, ChannelWrapper> channelTables = new ConcurrentHashMap<>();
-    private final List<ResponseFuture> responseFutures = new ArrayList<>();
+    /**
+     * This map caches all on-going requests.
+     */
+    private final ConcurrentMap<Integer /* opaque */, ResponseFuture> responseTable = new ConcurrentHashMap<>();
+
     ExecutorService executor = Executors.newFixedThreadPool(4, new ThreadFactoryImpl("NettyClientPublicExecutor_"));
-    ;
+
     private final HashedWheelTimer timer = new HashedWheelTimer(r -> new Thread(r, "ClientHouseKeepingService"));
 
 
     public NettyRemotingClient() {
         this.eventLoopGroupWorker = new NioEventLoopGroup(1, new ThreadFactoryImpl("NettyClientSelector_"));
 
-        //补偿
-        TimerTask timerTaskScanResponseTable = new TimerTask() {
-            @Override
-            public void run(Timeout timeout) {
-                try {
-                    NettyRemotingClient.this.scanResponseTable();
-                } catch (Throwable e) {
-                    System.out.println("TimerTaskScanResponseTable run error");
-                } finally {
-                    timer.newTimeout(this, 1000, TimeUnit.MILLISECONDS);
-                }
-            }
-        };
-        this.timer.newTimeout(timerTaskScanResponseTable, 1000 * 3, TimeUnit.MILLISECONDS);
+        //补偿，超时管理
+        //TimerTask timerTaskScanResponseTable = new TimerTask() {
+        //    @Override
+        //    public void run(Timeout timeout) {
+        //        try {
+        //            NettyRemotingClient.this.scanResponseTable();
+        //        } catch (Throwable e) {
+        //            System.out.println("TimerTaskScanResponseTable run error");
+        //        } finally {
+        //            timer.newTimeout(this, 1000, TimeUnit.MILLISECONDS);
+        //        }
+        //    }
+        //};
+        //this.timer.newTimeout(timerTaskScanResponseTable, 1000 * 3, TimeUnit.MILLISECONDS);
     }
 
 
@@ -57,14 +59,8 @@ public class NettyRemotingClient {
         Attribute<String> att = channel.attr(AttributeKey.valueOf("RemoteAddr"));
         String channelRemoteAddr = att.get();
         if (channel != null && channel.isActive()) {
-            long left = timeoutMillis;
 
-            long costTime = System.currentTimeMillis() - beginStartTime;
-            left -= costTime;
-            if (left <= 0) {
-                System.out.println("invokeSync call the addr[" + channelRemoteAddr + "] timeout");
-            }
-            RemotingCommand response = this.invokeSyncImpl(channel, request, left);
+            RemotingCommand response = this.invokeSyncImpl(channel, request, timeoutMillis);
             return response;
         } else {
             return null;
@@ -84,9 +80,10 @@ public class NettyRemotingClient {
 
     public void scanResponseTable() {
         final List<ResponseFuture> rfList = new LinkedList<>();
-        Iterator<ResponseFuture> it = this.responseFutures.iterator();
+        Iterator<Map.Entry<Integer, ResponseFuture>> it = this.responseTable.entrySet().iterator();
         while (it.hasNext()) {
-            ResponseFuture rep = it.next();
+            Map.Entry<Integer, ResponseFuture> next = it.next();
+            ResponseFuture rep = next.getValue();
 
             if ((rep.getBeginTimestamp() + rep.getTimeoutMillis() + 1000) <= System.currentTimeMillis()) {
                 rep.release();
@@ -141,17 +138,10 @@ public class NettyRemotingClient {
     private CompletableFuture<ResponseFuture> invoke0(final Channel channel, final RemotingCommand request,
                                                       final long timeoutMillis) {
         CompletableFuture<ResponseFuture> future = new CompletableFuture<>();
-        long beginStartTime = System.currentTimeMillis();
 
-        long costTime = System.currentTimeMillis() - beginStartTime;
-        if (timeoutMillis < costTime) {
-            System.out.println("invokeAsyncImpl call the addr[" + channel.remoteAddress() + "] timeout");
-            future.completeExceptionally(new RuntimeException("invokeAsyncImpl call timeout"));
-            return future;
-        }
 
         AtomicReference<ResponseFuture> responseFutureReference = new AtomicReference<>();
-        final ResponseFuture responseFuture = new ResponseFuture(channel, 0, request, timeoutMillis - costTime,
+        final ResponseFuture responseFuture = new ResponseFuture(channel, 0, request, 3_000,
                 new InvokeCallback() {
                     @Override
                     public void operationComplete(ResponseFuture responseFuture) {
@@ -169,7 +159,8 @@ public class NettyRemotingClient {
                     }
                 });
         responseFutureReference.set(responseFuture);
-        this.responseFutures.add(responseFuture);
+        int opaque = request.getOpaque();
+        this.responseTable.put(opaque, responseFuture);
         try {
             channel.writeAndFlush(request).addListener((ChannelFutureListener) f -> {
                 if (f.isSuccess()) {
@@ -185,6 +176,36 @@ public class NettyRemotingClient {
         }
     }
 
+
+    public void invokeAsync(String addr, RemotingCommand request, long timeoutMillis, InvokeCallback invokeCallback) throws InterruptedException {
+        final ChannelFuture channelFuture = this.getAndCreateChannelAsync(addr);
+        if (null == channelFuture) {
+            System.out.println("invokeAsync: channel is null");
+            if (invokeCallback != null) {
+                invokeCallback.operationFail(new RuntimeException("channel is null"));
+            }
+            return;
+        }
+        //实现异步调用
+        channelFuture.addListener(future -> {
+            if (future.isSuccess()) {
+                Channel channel = channelFuture.channel();
+                Attribute<String> att = channel.attr(AttributeKey.valueOf("RemoteAddr"));
+                System.out.println("invokeAsync: channel is active, addr=" + att.get());
+                if (channel != null && channel.isActive()) {
+                    this.invokeAsyncImpl(channel, request, timeoutMillis, invokeCallback);
+                } else {
+                    if (invokeCallback != null) {
+                        invokeCallback.operationFail(new RuntimeException("channel is not active"));
+                    }
+                }
+            } else {
+                if (invokeCallback != null) {
+                    invokeCallback.operationFail(future.cause());
+                }
+            }
+        });
+    }
 
     public void invokeOneway(String addr, RemotingCommand request, long timeoutMillis) throws InterruptedException {
         final ChannelFuture channelFuture = this.getAndCreateChannelAsync(addr);
@@ -204,6 +225,32 @@ public class NettyRemotingClient {
                 }
             }
         });
+    }
+
+    private void invokeAsyncImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis, final InvokeCallback invokeCallback) {
+        final ResponseFuture responseFuture = new ResponseFuture(channel, 0, request, -1, invokeCallback);
+        int opaque = request.getOpaque();
+        //做超时补偿
+        this.responseTable.put(opaque, responseFuture);
+        try {
+            channel.writeAndFlush(request).addListener((ChannelFutureListener) f -> {
+                if (f.isSuccess()) {
+                    responseFuture.setSendRequestOK(true);
+                    return;
+                } else {
+                    responseFuture.setSendRequestOK(false);
+                    this.responseTable.remove(opaque);
+                    responseFuture.setCause(f.cause());
+                    responseFuture.putResponse(null);
+                    System.out.println("send a request command to channel <" + channel.remoteAddress() + "> failed.");
+                }
+            });
+        } catch (Exception e) {
+            this.responseTable.remove(opaque);
+            responseFuture.setCause(e);
+            responseFuture.putResponse(null);
+            System.out.println("write send a request command to channel <" + channel.remoteAddress() + "> failed.");
+        }
     }
 
     private void invokeOnewayImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis) throws InterruptedException {
@@ -300,12 +347,12 @@ public class NettyRemotingClient {
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
             //processMessageReceived(ctx, msg);
-            final ResponseFuture responseFuture = responseFutures.get(0);
+            int opaque = msg.getOpaque();
+            final ResponseFuture responseFuture = responseTable.get(opaque);
             if (responseFuture != null) {
                 responseFuture.setResponseCommand(msg);
 
-                responseFutures.remove(responseFuture);
-
+                responseTable.remove(opaque);
                 if (responseFuture.getInvokeCallback() != null) {
                     executeInvokeCallback(responseFuture);
                 } else {

@@ -23,16 +23,6 @@ public class ConsumerClient_3 {
     }
 
     public void run() throws Exception {
-        pullMessageService.sendHeartbeatToBroker();
-        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
-            try {
-                pullMessageService.sendHeartbeatToBroker();
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
-        }, 10, 30_000, TimeUnit.MILLISECONDS);
-
-
         TopicRouteData topicRouteData = pullMessageService.queryTopicRouteInfo("Topic-T01");
         String topic = topicRouteData.getTopic();
         Map<String, Integer> queueTable = topicRouteData.getQueueTable();
@@ -48,6 +38,15 @@ public class ConsumerClient_3 {
                 this.pullMessageService.rebalanceService.addTopicSubscribeInfo(pullRequest.getTopic(), new MessageQueue( pullRequest.getTopic(), pullRequest.getBrokerName(), pullRequest.getQueueId()));
             }
         });
+
+        pullMessageService.sendHeartbeatToBroker(topic);
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            try {
+                pullMessageService.sendHeartbeatToBroker(topic);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }, 10, 30_000, TimeUnit.MILLISECONDS);
         new Thread(pullMessageService).start();
     }
 

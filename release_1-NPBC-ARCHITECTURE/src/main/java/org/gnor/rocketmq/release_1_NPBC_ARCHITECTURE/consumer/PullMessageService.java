@@ -3,7 +3,9 @@ package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.consumer;
 import com.alibaba.fastjson2.JSON;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.common_1.TopicRouteData;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.InvokeCallback;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.NettyRemotingClient;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.ResponseFuture;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -67,6 +69,33 @@ public class PullMessageService implements Runnable {
             return;
         }
 
+        //release_1：异步化改造
+        InvokeCallback invokeCallback = new InvokeCallback() {
+
+            @Override
+            public void operationComplete(ResponseFuture responseFuture) {
+
+            }
+
+            @Override
+            public void operationSucceed(RemotingCommand response) {
+                // 读取服务器发送的消息
+                if (response.getFlag() == RemotingCommand.RESPONSE_FLAG) {
+                    System.out.println("release收到服务器响应消息: " + response.getHey() + " [时间: " +
+                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + pullRequest.getQueueId() + "]");
+                } else {
+                    System.out.println("收到服务器消息: " + response.getHey());
+                }
+                executePullRequest(pullRequest);
+            }
+
+            @Override
+            public void operationFail(Throwable throwable) {
+                InvokeCallback.super.operationFail(throwable);
+            }
+        };
+
+
         try {
             String brokerName = pullRequest.getBrokerName();
             String brokerAddr = brokerAddrTable.get(brokerName);
@@ -96,27 +125,17 @@ public class PullMessageService implements Runnable {
             }}));
             consumerCmd.setHey("Pull message request from consumer");
             System.out.println("发送拉取消息请求: " + consumerCmd.getHey());
-            RemotingCommand consumerRsp = this.remotingClient.invokeSync(brokerAddr, consumerCmd, 30000L);
-
-            // 读取服务器发送的消息
-            if (consumerRsp.getFlag() == RemotingCommand.RESPONSE_FLAG) {
-                System.out.println("收到服务器响应消息: " + consumerRsp.getHey() + " [时间: " +
-                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + pullRequest.getQueueId() + "]");
-            } else {
-                System.out.println("收到服务器消息: " + consumerRsp.getHey());
-            }
+            this.remotingClient.invokeAsync(brokerAddr, consumerCmd, 30000L, invokeCallback);
         } finally {
-            this.executePullRequest(pullRequest);
+            //this.executePullRequest(pullRequest);
         }
 
     }
 
-    public boolean sendHeartbeatToBroker() {
-        this.pullRequestQueue.forEach(pullRequest -> {
-            String brokerName = pullRequest.getBrokerName();
-            String brokerAddr = brokerAddrTable.get(brokerName);
+    public boolean sendHeartbeatToBroker(String topic) {
+        brokerAddrTable.forEach((bn, ba) -> {
+            String brokerAddr = ba;
             String clientId = buildMQClientId();
-            String topic = pullRequest.getTopic();
 
             RemotingCommand remotingCommand = new RemotingCommand();
             remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
@@ -129,8 +148,27 @@ public class PullMessageService implements Runnable {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
         });
+
+        //this.pullRequestQueue.forEach(pullRequest -> {
+        //    String brokerName = pullRequest.getBrokerName();
+        //    String brokerAddr = brokerAddrTable.get(brokerName);
+        //    String clientId = buildMQClientId();
+        //    String topic = pullRequest.getTopic();
+        //
+        //    RemotingCommand remotingCommand = new RemotingCommand();
+        //    remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        //    remotingCommand.setCode(RemotingCommand.HEART_BEAT);
+        //    remotingCommand.setClientId(clientId);
+        //    remotingCommand.setTopic(topic);
+        //    remotingCommand.setHey("Heartbeat from consumer");
+        //    try {
+        //        this.remotingClient.invokeSync(brokerAddr, remotingCommand, 30000L);
+        //    } catch (InterruptedException e) {
+        //        throw new RuntimeException(e);
+        //    }
+        //
+        //});
         return true;
     }
 

@@ -2,6 +2,8 @@ package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.client;
 
 import io.netty.channel.Channel;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ public class ConsumerManager {
         if (null == old) {
             this.consumerTable.put(clientId, new ConsumerInfo(clientId, channel, topic, tagsCode));
         } else {
+            System.out.println("registerConsumer: " + clientId + " already exists, update timestamp:" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             old.setLastUpdateTimestamp(channel);
         }
         return true;
@@ -43,6 +46,7 @@ public class ConsumerManager {
                 ClientChannelInfo clientChannelInfo = nextChannel.getValue();
                 long diff = System.currentTimeMillis() - clientChannelInfo.getLastUpdateTimestamp();
                 if (diff > 30_000) {
+                    System.out.println("SCAN: remove expired channel from ConsumerManager consumerTable, consumerGroup=" + next.getKey() + ", channel=" + clientChannelInfo.getChannel() + ", diff=" + diff + ": " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     //clientChannelInfo.getChannel().close();
                     itChannel.remove();
                 }
