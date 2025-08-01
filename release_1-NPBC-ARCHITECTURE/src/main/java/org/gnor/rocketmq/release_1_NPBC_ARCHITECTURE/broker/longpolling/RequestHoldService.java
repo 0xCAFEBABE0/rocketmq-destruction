@@ -1,7 +1,11 @@
-package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker;
+package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.longpolling;
 
 import com.alibaba.fastjson2.JSONObject;
 import org.gnor.rocketmq.common_1.RemotingCommand;
+import org.gnor.rocketmq.common_1.thread.ServiceThread;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.BrokerStartup;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.MessageStore;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.SuspendRequest;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,7 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class RequestHoldService implements Runnable {
+public class RequestHoldService extends ServiceThread {
     protected ConcurrentMap<String /*topic*/ , List<SuspendRequest>> suspendRequests = new ConcurrentHashMap<>();
 
     public ConcurrentMap<String /*topic*/ , List<SuspendRequest>> getSuspendRequests() {
@@ -25,10 +29,17 @@ public class RequestHoldService implements Runnable {
 
     @Override
     public void run() {
-        while (true) {
+        System.out.println(this.getServiceName() + " started.");
+        while (!this.stopped) {
             try {
-                Thread.sleep(5000L);
-                checkHoldRequest();
+                this.waitForRunning(5 * 1000);
+
+                long startTime = System.currentTimeMillis();
+                this.checkHoldRequest();
+                long costTime = System.currentTimeMillis() - startTime;
+                if (costTime > 5000) {
+                    System.out.println("Long Polling cost too much time. " + costTime + "ms");
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -93,5 +104,10 @@ public class RequestHoldService implements Runnable {
                 it.remove();
             }
         }
+    }
+
+    @Override
+    public String getServiceName() {
+        return RequestHoldService.class.getSimpleName();
     }
 }

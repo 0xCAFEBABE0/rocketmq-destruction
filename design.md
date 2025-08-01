@@ -3,23 +3,29 @@
 ### 1. 消息怎么投递给消费者
  长轮询时的4个细节处理
 
-- 客户端请求异步化
+- 客户端请求异步化 ✅
 `
 导致很多queue时，数据延迟是很大的。
 PushConsumer并没有往多线程的思路实现，而是把Pull请求做成了异步化，减小寄生在客户端上的负担。DefaultLitePullConsumerImpl底层的多队列实现则是多线程+同步的方式进行拉取
 `
 
-- 服务端超时处理细节
+- 服务端超时处理细节 ✅
 `
 无消息到达时，防止客户端会产生大量超时，定时处理返回PULL_NOT_FOUND
 `
  
-- 服务端多线程交互
+- 服务端多线程交互 
 `
   服务端逻辑散落在不同的线程处理上
-pull线程、put线程，处理消息写入、holdCheck线程，定期任务检查超时时间
+pull线程、
+put线程，处理消息写入、
+holdCheck线程，定期任务检查超时时间
 PullRequestHoldService，涉及多个线程池之间的线程唤醒
 `
+
+触发消费逻辑，在pull线程中：PullMessageProcessor
+put线程：写入cl后，异步写入cq，在写入后执行notify激活hold线程:PullRequestHoldService
+
 
 - 合并多个Pull请求
 `
