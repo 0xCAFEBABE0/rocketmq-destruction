@@ -3,7 +3,7 @@ package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.processor;
 import io.netty.channel.Channel;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.BrokerStartup;
-import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.SuspendRequest;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.SuspendRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +22,8 @@ public class PullMessageProcessor  {
                 remotingCommand.getConsumerOffset(), remotingCommand.getQueueId(), remotingCommand.getOpaque());
         //todo 可移到RequestHoldService统一管理
         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = this.brokerStartup.getRequestHoldService().getSuspendRequests();
-        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(topic, new ArrayList<>());
+        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(SuspendRequest.buildKey(topic, remotingCommand.getQueueId()), new ArrayList<>());
         suspendRequestList.add(sr);
-        suspendRequests.put(topic, suspendRequestList);
+        suspendRequests.put(SuspendRequest.buildKey(topic, remotingCommand.getQueueId()), suspendRequestList);
     }
 }

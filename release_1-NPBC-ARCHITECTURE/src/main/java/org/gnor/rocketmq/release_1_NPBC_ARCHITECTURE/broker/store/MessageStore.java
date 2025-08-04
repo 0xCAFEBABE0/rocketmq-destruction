@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker;
+package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store;
 
 
 import com.alibaba.fastjson2.JSONObject;
@@ -52,11 +52,25 @@ public class MessageStore {
             this.tagCode = tagCode;
         }
 
-        public int getPosition() { return position; }
-        public int getSize() { return size; }
-        public String getTopic() { return topic; }
-        public long getCqPosition() { return cqPosition; }
-        public long getTagCode() { return tagCode; }
+        public int getPosition() {
+            return position;
+        }
+
+        public int getSize() {
+            return size;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public long getCqPosition() {
+            return cqPosition;
+        }
+
+        public long getTagCode() {
+            return tagCode;
+        }
     }
 
     public static class StoredMessage {
@@ -72,10 +86,21 @@ public class MessageStore {
             this.queueId = queueId;
         }
 
-        public String getTopic() { return topic; }
-        public String getBody() { return body; }
-        public String getStatus() { return status; }
-        public int getQueueId() { return queueId; }
+        public String getTopic() {
+            return topic;
+        }
+
+        public String getBody() {
+            return body;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public int getQueueId() {
+            return queueId;
+        }
     }
 
     static {
@@ -139,9 +164,9 @@ public class MessageStore {
         writeBuffer.putInt(queueId); //QUEUEID, need update later
         writeBuffer.putInt(bodyLength);
         writeBuffer.put(bodyData);
-        writeBuffer.putShort((short)topicLength);
+        writeBuffer.putShort((short) topicLength);
         writeBuffer.put(topicData);
-        writeBuffer.putShort((short)propertiesLength);
+        writeBuffer.putShort((short) propertiesLength);
         writeBuffer.put(propertiesBytes);
         writeBuffer.flip(); // Prepare for reading
         System.out.println("msgLength: " + msgLength);
@@ -168,9 +193,19 @@ public class MessageStore {
 
         //v5版本新增：consumeQueue
         //v7版本新增：tag
-        Map<String, String> propMap = JSONObject.parseObject(properties, Map.class);
-        String tag = propMap.get("TAG");
-        int tagCode = tag.hashCode();
+        //Map<String, String> propMap = JSONObject.parseObject(properties, Map.class);
+        //String tag = propMap.get("TAG");
+        //int tagCode = tag.hashCode();
+        //consumeQueueStore.appendMessage(topic, msgLength, currentPos, tagCode, queueId);
+    }
+
+    public void putMessageToCq(DispatchRequest dispatchRequest) {
+        String topic = dispatchRequest.getTopic();
+        int msgLength = dispatchRequest.getMsgSize();
+        long currentPos = dispatchRequest.getCommitLogOffset();
+        long tagCode = dispatchRequest.getTagsCode();
+        int queueId = dispatchRequest.getQueueId();
+        System.out.println("putMessageToCq: " + topic + ", " + msgLength + ", " + currentPos + ", " + tagCode + ", " + queueId);
         consumeQueueStore.appendMessage(topic, msgLength, currentPos, tagCode, queueId);
     }
 
@@ -217,7 +252,6 @@ public class MessageStore {
     //    }
     //    return getMessage(metadata.getPosition(), metadata.getSize());
     //}
-
     public StoredMessage consumeMessage(String topic, long pullFromThisOffset, String tag, int queueId) {
         MessageMetadata metadata = consumeQueueStore.consumeMessage(topic, pullFromThisOffset, queueId);
         if (null == metadata) {
@@ -236,12 +270,116 @@ public class MessageStore {
         return getMessage(metadata.getPosition(), metadata.getSize());
     }
 
+    /*release_1-NPBC-ARCHITECTURE*/
+    public int getReadPosition() {
+        return WROTE_POSITION_UPDATER.get(this);
+    }
+
+    public SelectMappedBufferResult getData(int pos) {
+        int readPosition = getReadPosition();
+        if (pos >= readPosition) {
+            return null;
+        }
+        ByteBuffer byteBuffer = this.mappedByteBuffer.duplicate();
+        byteBuffer.position(pos);
+        int size = readPosition - pos;
+        ByteBuffer byteBufferNew = byteBuffer.slice();
+        byteBufferNew.limit(size);
+        return new SelectMappedBufferResult(pos, byteBufferNew, size);
+    }
+
+    public DispatchRequest checkMessageAndReturnSize(ByteBuffer readBuffer) {
+        int totalSize = readBuffer.getInt();
+        long physicOffset = readBuffer.getLong();
+        int queueId = readBuffer.getInt();
+        int bodySize = readBuffer.getInt();
+        byte[] bodyData = new byte[bodySize];
+        readBuffer.get(bodyData);
+        int topicSize = readBuffer.getShort() & 0xFFFF; // Convert to unsigned
+        byte[] topicData = new byte[topicSize];
+        readBuffer.get(topicData);
+
+        int propertiesSize = readBuffer.getShort() & 0xFFFF; // Convert to unsigned
+        byte[] propertiesData = new byte[propertiesSize];
+        readBuffer.get(propertiesData);
+        Map<String, String> propertiesMap = JSONObject.parseObject(new String(propertiesData, StandardCharsets.UTF_8), Map.class);
+
+        return new DispatchRequest(new String(topicData), queueId, physicOffset, totalSize, propertiesMap.get("TAG").hashCode(), propertiesMap);
+    }
+
+    public class SelectMappedBufferResult {
+        private final long startOffset;
+        private final ByteBuffer byteBuffer;
+        private int size;
+
+        public SelectMappedBufferResult(long startOffset, ByteBuffer byteBuffer, int size) {
+            this.startOffset = startOffset;
+            this.byteBuffer = byteBuffer;
+            this.size = size;
+        }
+
+        public long getStartOffset() {
+            return startOffset;
+        }
+
+        public ByteBuffer getByteBuffer() {
+            return byteBuffer;
+        }
+
+        public int getSize() {
+            return size;
+        }
+    }
+
+    public class DispatchRequest {
+        private final String topic;
+        private final int queueId;
+        private final long commitLogOffset;
+        private int msgSize;
+        private final long tagsCode;
+        private final Map<String, String> propertiesMap;
+
+        public DispatchRequest(String topic, int queueId, long commitLogOffset, int msgSize, long tagsCode, Map<String, String> propertiesMap) {
+            this.topic = topic;
+            this.queueId = queueId;
+            this.commitLogOffset = commitLogOffset;
+            this.msgSize = msgSize;
+            this.tagsCode = tagsCode;
+            this.propertiesMap = propertiesMap;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public int getQueueId() {
+            return queueId;
+        }
+
+        public long getCommitLogOffset() {
+            return commitLogOffset;
+        }
+
+        public int getMsgSize() {
+            return msgSize;
+        }
+
+        public long getTagsCode() {
+            return tagsCode;
+        }
+
+        public Map<String, String> getPropertiesMap() {
+            return propertiesMap;
+        }
+    }
+
+
     public static void main(String[] args) {
         MessageStore messageStore = new MessageStore(new ConsumerOffsetManager());
         messageStore.appendMessage("Topic-test", "aaaHello.", "", 0);
         messageStore.appendMessage("Topic-test", "2aaaHello.", "", 0);
 
         messageStore.getMessage(0, 37);
-        messageStore.getMessage( 37, 38);
+        messageStore.getMessage(37, 38);
     }
 }

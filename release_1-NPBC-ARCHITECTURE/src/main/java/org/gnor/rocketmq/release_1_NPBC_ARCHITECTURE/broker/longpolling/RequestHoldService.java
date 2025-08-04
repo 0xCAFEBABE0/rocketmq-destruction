@@ -4,8 +4,8 @@ import com.alibaba.fastjson2.JSONObject;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.common_1.thread.ServiceThread;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.BrokerStartup;
-import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.MessageStore;
-import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.SuspendRequest;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.MessageStore;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.SuspendRequest;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public class RequestHoldService extends ServiceThread {
-    protected ConcurrentMap<String /*topic*/ , List<SuspendRequest>> suspendRequests = new ConcurrentHashMap<>();
+    protected ConcurrentMap<String /*topic@queueId*/ , List<SuspendRequest>> suspendRequests = new ConcurrentHashMap<>();
 
-    public ConcurrentMap<String /*topic*/ , List<SuspendRequest>> getSuspendRequests() {
+    public ConcurrentMap<String /*topic@queueId*/ , List<SuspendRequest>> getSuspendRequests() {
         return suspendRequests;
     }
 
@@ -56,12 +56,15 @@ public class RequestHoldService extends ServiceThread {
         }
     }
 
-    public void notifyMessageArriving(String topic) throws InterruptedException {
-        List<SuspendRequest> suspendRequests = this.suspendRequests.get(topic);
+    public void notifyMessageArriving(String key) throws InterruptedException {
+        List<SuspendRequest> suspendRequests = this.suspendRequests.get(key);
         if (null == suspendRequests || suspendRequests.isEmpty()) {
             System.out.println("没有请求需要唤醒。");
             return;
         }
+        String[] ks = key.split(SuspendRequest.TOPIC_QUEUEID_SEPARATOR);
+        String topic = ks[0];
+
         //ConcurrentMap<String, List<RemotingCommand>> storeTopicRecord = this.brokerStartup.getStoreTopicRecord();
         //List<RemotingCommand> storeDataList = storeTopicRecord.get(topic);
         MessageStore messageStore = brokerStartup.getMessageStore();

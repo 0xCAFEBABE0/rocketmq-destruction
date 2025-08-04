@@ -15,6 +15,9 @@ import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.client.ConsumerManag
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.longpolling.RequestHoldService;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.processor.PullMessageProcessor;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.processor.SendMessageProcessor;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.ConsumerOffsetManager;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.MessageStore;
+import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store.ReputMessageService;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.NettyRemotingClient;
 
 import java.net.InetSocketAddress;
@@ -61,6 +64,7 @@ public class BrokerStartup {
     /*release_1版本新增：消息拉取处理器*/
     private PullMessageProcessor pullMessageProcessor;
     private SendMessageProcessor sendMessageProcessor;
+    private ReputMessageService reputMessageService;
 
     public MessageStore getMessageStore() {
         return messageStore;
@@ -83,6 +87,7 @@ public class BrokerStartup {
 
         this.pullMessageProcessor = new PullMessageProcessor(this);
         this.sendMessageProcessor = new SendMessageProcessor(this);
+        this.reputMessageService = new ReputMessageService(this);
     }
 
     public void start() {
@@ -122,6 +127,8 @@ public class BrokerStartup {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        reputMessageService.start();
     }
 
     public static void main(String[] args) {

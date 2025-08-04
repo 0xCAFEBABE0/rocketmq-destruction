@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker;
+package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;

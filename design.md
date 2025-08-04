@@ -14,7 +14,7 @@ PushConsumer并没有往多线程的思路实现，而是把Pull请求做成了�
 无消息到达时，防止客户端会产生大量超时，定时处理返回PULL_NOT_FOUND
 `
  
-- 服务端多线程交互 
+- 服务端多线程交互 ✅
 `
   服务端逻辑散落在不同的线程处理上
 pull线程、
@@ -27,7 +27,7 @@ PullRequestHoldService，涉及多个线程池之间的线程唤醒
 put线程：写入cl后，异步写入cq，在写入后执行notify激活hold线程:PullRequestHoldService
 
 
-- 合并多个Pull请求
+- 合并多个Pull请求 ✅
 `
  服务端合并成一个mpr ManyPullRequest，管理到queue维度并非topic维度
  有消息到了能一下子找到对应的pull请求背后的连接去写响应包

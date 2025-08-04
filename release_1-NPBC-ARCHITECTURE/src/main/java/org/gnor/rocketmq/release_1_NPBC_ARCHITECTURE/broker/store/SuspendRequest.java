@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker;
+package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store;
 
 import io.netty.channel.Channel;
 import org.gnor.rocketmq.common_1.RemotingCommand;
@@ -33,6 +33,15 @@ public class SuspendRequest {
         this.pullFromThisOffset = pullFromThisOffset;
         this.queueId = queueId;
         this.opaque = opaque;
+    }
+
+    public static final String TOPIC_QUEUEID_SEPARATOR = "@";
+    public static String buildKey(final String topic, final int queueId) {
+        StringBuilder sb = new StringBuilder(topic.length() + 5);
+        sb.append(topic);
+        sb.append(TOPIC_QUEUEID_SEPARATOR);
+        sb.append(queueId);
+        return sb.toString();
     }
 
     public Channel getClientChannel() {

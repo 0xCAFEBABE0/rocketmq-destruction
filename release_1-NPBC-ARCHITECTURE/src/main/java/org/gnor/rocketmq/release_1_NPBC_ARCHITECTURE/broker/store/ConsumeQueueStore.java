@@ -1,4 +1,4 @@
-package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker;
+package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.store;
 
 import java.io.File;
 import java.io.IOException;
