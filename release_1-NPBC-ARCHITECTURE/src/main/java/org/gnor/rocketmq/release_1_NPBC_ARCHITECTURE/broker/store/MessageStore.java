@@ -259,7 +259,7 @@ public class MessageStore {
         }
 
         //v6版本新增：commitOffsetManager，写回commitOffset
-        this.consumerOffsetManager.commitOffset(topic, metadata.getCqPosition(), queueId);
+        //this.consumerOffsetManager.commitOffset(topic, metadata.getCqPosition(), queueId);
         //v7版本新增：tagCode
         if (null != tag && !tag.isEmpty()) {
             //NO_MATCHED_MESSAGE

@@ -38,7 +38,7 @@ put线程：写入cl后，异步写入cq，在写入后执行notify激活hold线
 4个线程池参与核心的工作
 - PullMessageServiceScheduledThread
 - 回调线程池
-- 消费线程池
+- 消费线程池 ✅
 - MQClientFactoryScheduledThread，持续把内存的消费进度定期同步给Broker
 
 ### 3. 消息进度如何管理

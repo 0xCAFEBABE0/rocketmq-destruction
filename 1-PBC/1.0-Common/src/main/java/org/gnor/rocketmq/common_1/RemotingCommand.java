@@ -37,6 +37,8 @@ public class RemotingCommand {
     /*release_1版本新增*/
     private static final AtomicInteger requestId = new AtomicInteger(0);
     private int opaque = requestId.getAndIncrement();
+    private Long commitOffset;
+    private Long nextBeginOffset;
 
     public static final int REQUEST_FLAG = 0;
     public static final int RESPONSE_FLAG = 1;
@@ -56,6 +58,9 @@ public class RemotingCommand {
     /*v11版本新增*/
     public static final int GET_CONSUMER_LIST_BY_GROUP = 38;
     public static final int HEART_BEAT = 34;
+
+    /*release_1版本新增*/
+    public static final int UPDATE_CONSUMER_OFFSET = 15;
 
 
     public void setBrokerName(String brokerName) {
@@ -114,6 +119,20 @@ public class RemotingCommand {
         this.consumerOffset = consumerOffset;
     }
 
+    public Long getCommitOffset() {
+        return commitOffset;
+    }
+
+    public void setCommitOffset(Long commitOffset) {
+        this.commitOffset = commitOffset;
+    }
+
+    public Long getNextBeginOffset() {
+        return nextBeginOffset;
+    }
+    public void setNextBeginOffset(Long nextBeginOffset) {
+        this.nextBeginOffset = nextBeginOffset;
+    }
     public String getConsumerGroup() {
         return consumerGroup;
     }
@@ -209,4 +228,6 @@ public class RemotingCommand {
 
         return cmd;
     }
+
+
 }

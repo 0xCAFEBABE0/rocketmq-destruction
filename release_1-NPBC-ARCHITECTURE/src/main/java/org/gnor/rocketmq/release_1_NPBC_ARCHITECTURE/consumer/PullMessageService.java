@@ -27,8 +27,8 @@ public class PullMessageService implements Runnable {
     Map<String, String> brokerAddrTable;
 
     /*release_1版本新增：消费线程池*/
-    private DefaultMQPushConsumer defaultMQPushConsumer;
-    private ThreadPoolExecutor consumeExecutor;
+    private final DefaultMQPushConsumer defaultMQPushConsumer;
+    private final ThreadPoolExecutor consumeExecutor;
 
     public PullMessageService(DefaultMQPushConsumer defaultMQPushConsumer) {
         this.defaultMQPushConsumer = defaultMQPushConsumer;
@@ -41,9 +41,6 @@ public class PullMessageService implements Runnable {
                 new ThreadFactoryImpl("ConsumeMessageThread_" ));
 
     }
-    public PullMessageService(){}
-
-
 
     public void executePullRequest(PullRequest pullRequest) {
         try {
@@ -104,14 +101,25 @@ public class PullMessageService implements Runnable {
                 // 读取服务器发送的消息
                 if (response.getFlag() == RemotingCommand.RESPONSE_FLAG) {
 
-                    consumeExecutor.submit(() -> {
-                        TreeMap<Long, RemotingCommand> msgTreeMap = pullRequest.getMsgTreeMap();
-                        msgTreeMap.put(response.getConsumerOffset(), response);
+                    if (response.getCode() == RemotingCommand.CONSUMER_MSG) {
+                        consumeExecutor.submit(() -> {
+                            ProcessQueue processQueue = pullRequest.getProcessQueue();
 
-                        List<RemotingCommand> msgs = new ArrayList<>();
-                        msgs.add(response);
-                        ConsumeConcurrentlyStatus consumeConcurrentlyStatus = defaultMQPushConsumer.getMessageListener().consumeMessage(msgs, pullRequest);
-                    });
+                            List<RemotingCommand> msgs = new ArrayList<>();
+                            msgs.add(response);
+                            boolean b = processQueue.putMessage(msgs);
+
+                            ConsumeConcurrentlyStatus consumeConcurrentlyStatus = defaultMQPushConsumer.getMessageListener().consumeMessage(msgs, pullRequest);
+
+                            if (consumeConcurrentlyStatus == ConsumeConcurrentlyStatus.CONSUME_SUCCESS) {
+                                long offset = processQueue.removeMessage(msgs);
+                                if (offset >= 0 && !pullRequest.isDropped()) {
+                                    defaultMQPushConsumer.getOffsetStore().updateOffset(pullRequest.getMessageQueue(), offset);
+                                }
+                            }
+
+                        });
+                    }
 
                 } else {
                     System.out.println("收到服务器消息: " + response.getHey());
@@ -127,28 +135,28 @@ public class PullMessageService implements Runnable {
 
 
         try {
-            String brokerName = pullRequest.getBrokerName();
+            MessageQueue messageQueue = pullRequest.getMessageQueue();
+            String brokerName = messageQueue.getBrokerName();
             String brokerAddr = brokerAddrTable.get(brokerName);
 
-            RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
-            getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
-            getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
-            getConsumerOffsetCommand.setTopic(pullRequest.getTopic());
-            getConsumerOffsetCommand.setQueueId(pullRequest.getQueueId());
-            getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+            //RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
+            //getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+            //getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
+            //getConsumerOffsetCommand.setTopic(messageQueue.getTopic());
+            //getConsumerOffsetCommand.setQueueId(messageQueue.getQueueId());
+            //getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+            //
+            //System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
+            //RemotingCommand offsetCmd = this.remotingClient.invokeSync(brokerAddr, getConsumerOffsetCommand, 30000L);
 
-            System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
-            RemotingCommand offsetCmd = this.remotingClient.invokeSync(brokerAddr, getConsumerOffsetCommand, 30000L);
-
-
+            long consumeOffset = defaultMQPushConsumer.getOffsetStore().readOffset(messageQueue);
             // 发送拉取消息请求
-            long consumeOffset = offsetCmd.getConsumerOffset();
             RemotingCommand consumerCmd = new RemotingCommand();
             consumerCmd.setFlag(RemotingCommand.REQUEST_FLAG);
             consumerCmd.setCode(RemotingCommand.CONSUMER_MSG);
             consumerCmd.setConsumerGroup("ConsumerGroup-C01");
-            consumerCmd.setTopic(pullRequest.getTopic());
-            consumerCmd.setQueueId(pullRequest.getQueueId());
+            consumerCmd.setTopic(messageQueue.getTopic());
+            consumerCmd.setQueueId(messageQueue.getQueueId());
             consumerCmd.setConsumerOffset(consumeOffset);
             consumerCmd.setProperties(JSON.toJSONString(new HashMap<String, String>() {{
                 put("TAG", "TAG-A");
@@ -215,6 +223,24 @@ public class PullMessageService implements Runnable {
         //    sb.append(this.unitName);
         //}
         return sb.toString();
+    }
+
+    public void updateConsumeOffsetToBroker(MessageQueue messageQueue, long offset) {
+        String brokerName = messageQueue.getBrokerName();
+        String brokerAddr = brokerAddrTable.get(brokerName);
+
+        RemotingCommand updateConsumerOffsetCommand = new RemotingCommand();
+        updateConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        updateConsumerOffsetCommand.setCode(RemotingCommand.UPDATE_CONSUMER_OFFSET);
+        updateConsumerOffsetCommand.setTopic(messageQueue.getTopic());
+        updateConsumerOffsetCommand.setQueueId(messageQueue.getQueueId());
+        updateConsumerOffsetCommand.setCommitOffset(offset);
+        updateConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+        try {
+            this.remotingClient.invokeSync(brokerAddr, updateConsumerOffsetCommand, 30000L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 

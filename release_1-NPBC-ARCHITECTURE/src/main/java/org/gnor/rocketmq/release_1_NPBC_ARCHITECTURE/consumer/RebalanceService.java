@@ -25,6 +25,11 @@ public class RebalanceService implements Runnable {
         this.topicSubscribeInfoTable.computeIfAbsent(topic, k -> new ArrayList<>()).add(mq);
     }
 
+    public ConcurrentMap<MessageQueue, PullRequest> getProcessQueueTable() {
+        return this.processQueueTable;
+    }
+
+
     @Override
     public void run() {
         while (true) {
@@ -100,16 +105,15 @@ public class RebalanceService implements Runnable {
                     //pq.setLocked(true);
                     //long nextOffset = this.computePullFromWhere(mq);
                     //if (nextOffset >= 0) {
-                    PullRequest pq = new PullRequest();
+                    PullRequest pq = new PullRequest(mq, new ProcessQueue());
                     PullRequest pre = this.processQueueTable.putIfAbsent(mq, pq);
                     if (pre != null) {
                         System.out.println("doRebalance, add a new mq failed, {}, because mq already exists" + mq);
                     } else {
                         System.out.println("doRebalance, add a new mq, " + mq);
-                        PullRequest pullRequest = new PullRequest();
-                        pullRequest.setTopic(mq.getTopic());
-                        pullRequest.setBrokerName(mq.getBrokerName());
-                        pullRequest.setQueueId(mq.getQueueId());
+
+                        MessageQueue messageQueue = new MessageQueue(mq.getTopic(), mq.getBrokerName(), mq.getQueueId());
+                        PullRequest pullRequest = new PullRequest(messageQueue, new ProcessQueue());
                         pullRequestList.add(pullRequest);
                     }
                     //} else {

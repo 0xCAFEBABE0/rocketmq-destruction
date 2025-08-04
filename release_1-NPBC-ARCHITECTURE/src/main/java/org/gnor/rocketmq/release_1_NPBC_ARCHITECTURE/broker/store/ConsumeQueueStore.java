@@ -62,7 +62,7 @@ public class ConsumeQueueStore {
         private int mappedFileSizeCQ = 10 * 1024 * 1024;
         //v7版本新增 tagCode
         //private int cqSize = 12;
-        private int cqSize = 20;
+        private static final int CQ_STORE_UNIT_SIZE = 20;
 
         public ConsumeQueue(String topic, int queueId) {
             this.topic = topic;
@@ -82,9 +82,15 @@ public class ConsumeQueueStore {
             }
         }
 
-        public void appendMessage(int size, long offset, long tagCode) {
+        /*release_1-NPBC-ARCHITECTURE */
+        //对外offset皆为index
+        public long convertIndexToCqOffset(long index) {
+            return index * ConsumeQueue.CQ_STORE_UNIT_SIZE;
+        }
+
+        public void appendMessage(int size, long index, long tagCode) {
             writeBuffer.clear();
-            writeBuffer.putLong(offset);
+            writeBuffer.putLong(convertIndexToCqOffset(index));
             writeBuffer.putInt(size);
             writeBuffer.putLong(tagCode);
             writeBuffer.flip();
@@ -92,22 +98,22 @@ public class ConsumeQueueStore {
             int currentPos = WROTE_POSITION_UPDATER.get(this);
             mappedByteBuffer.position(currentPos);
             mappedByteBuffer.put(writeBuffer);
-            WROTE_POSITION_UPDATER.addAndGet(this, cqSize);
+            WROTE_POSITION_UPDATER.addAndGet(this, CQ_STORE_UNIT_SIZE);
             this.mappedByteBuffer.force();
         }
 
         public MessageStore.MessageMetadata getCommitLogMetaFromCq(int cqPos) {
             ByteBuffer readBuffer = mappedByteBuffer.duplicate();
             readBuffer.position(cqPos);
-            readBuffer.limit(cqPos + cqSize);
+            readBuffer.limit(cqPos + CQ_STORE_UNIT_SIZE);
             long physicOffset = readBuffer.getLong();
             int size = readBuffer.getInt();
             long tagCode = readBuffer.getLong();
-            return new MessageStore.MessageMetadata((int) physicOffset, size, topic, cqPos + cqSize, tagCode);
+            return new MessageStore.MessageMetadata((int) physicOffset, size, topic, cqPos + CQ_STORE_UNIT_SIZE, tagCode);
         }
 
         public MessageStore.MessageMetadata consumeMessage(long pullFromThisOffset) {
-            int currentPos = (int)pullFromThisOffset;
+            int currentPos = (int) convertIndexToCqOffset(pullFromThisOffset);
             if (currentPos >= wrotePosition) {
                 return null;
             }

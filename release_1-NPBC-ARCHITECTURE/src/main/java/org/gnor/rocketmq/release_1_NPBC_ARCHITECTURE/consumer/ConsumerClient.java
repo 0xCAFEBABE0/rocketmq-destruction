@@ -21,7 +21,7 @@ public class ConsumerClient {
        new DefaultMQPushConsumer((res, context) -> {
            for (RemotingCommand response : res) {
                System.out.println("release收到服务器响应消息: " + response.getHey() + " [时间: " +
-                       LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + context.getQueueId() + "]");
+                       LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + context.getMessageQueue().getQueueId() + "]");
            }
            return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
        }).start();

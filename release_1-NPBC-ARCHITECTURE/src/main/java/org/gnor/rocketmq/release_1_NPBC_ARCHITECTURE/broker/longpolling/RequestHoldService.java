@@ -93,7 +93,9 @@ public class RequestHoldService extends ServiceThread {
                     continue;
                 }
                 RemotingCommand msgArrivingCmd = new RemotingCommand();
+                msgArrivingCmd.setCode( RemotingCommand.CONSUMER_MSG);
                 msgArrivingCmd.setOpaque(sr.getOpaque());
+                msgArrivingCmd.setNextBeginOffset(sr.getPullFromThisOffset() + 1);
                 if ("NO_MATCHED_MESSAGE".equals(storedMessage.getStatus())) {
                     msgArrivingCmd.setHey("NO_MATCHED_MESSAGE");
                     msgArrivingCmd.setTopic(storedMessage.getTopic());

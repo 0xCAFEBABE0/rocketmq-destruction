@@ -197,6 +197,12 @@ public class BrokerStartup {
                         response.setHey(JSONObject.toJSONString(consumerList));
                         channelHandlerContext.channel().writeAndFlush(response);
                         break;
+                    case RemotingCommand.UPDATE_CONSUMER_OFFSET:
+                        consumerOffsetManager.commitOffset(remotingCommand.getTopic(), remotingCommand.getCommitOffset(), remotingCommand.getQueueId());
+                        response.setFlag(RemotingCommand.RESPONSE_FLAG);
+                        response.setHey("Update consumer offset!");
+                        channelHandlerContext.channel().writeAndFlush(response);
+                        break;
                     default:
                         break;
                 }
