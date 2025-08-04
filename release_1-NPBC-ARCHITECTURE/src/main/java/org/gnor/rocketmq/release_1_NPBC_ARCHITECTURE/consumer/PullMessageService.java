@@ -1,7 +1,9 @@
 package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.consumer;
 
 import com.alibaba.fastjson2.JSON;
+import org.gnor.rocketmq.common_1.ConsumeConcurrentlyStatus;
 import org.gnor.rocketmq.common_1.RemotingCommand;
+import org.gnor.rocketmq.common_1.ThreadFactoryImpl;
 import org.gnor.rocketmq.common_1.TopicRouteData;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.InvokeCallback;
 import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.NettyRemotingClient;
@@ -9,10 +11,11 @@ import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.remoting.ResponseFuture;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class PullMessageService implements Runnable {
     private NettyRemotingClient remotingClient = new NettyRemotingClient();
@@ -22,6 +25,25 @@ public class PullMessageService implements Runnable {
     protected final RebalanceService rebalanceService = new RebalanceService(this);
 
     Map<String, String> brokerAddrTable;
+
+    /*release_1版本新增：消费线程池*/
+    private DefaultMQPushConsumer defaultMQPushConsumer;
+    private ThreadPoolExecutor consumeExecutor;
+
+    public PullMessageService(DefaultMQPushConsumer defaultMQPushConsumer) {
+        this.defaultMQPushConsumer = defaultMQPushConsumer;
+        this.consumeExecutor = new ThreadPoolExecutor(
+                20,
+                20,
+                1000 * 60,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                new ThreadFactoryImpl("ConsumeMessageThread_" ));
+
+    }
+    public PullMessageService(){}
+
+
 
     public void executePullRequest(PullRequest pullRequest) {
         try {
@@ -81,8 +103,16 @@ public class PullMessageService implements Runnable {
             public void operationSucceed(RemotingCommand response) {
                 // 读取服务器发送的消息
                 if (response.getFlag() == RemotingCommand.RESPONSE_FLAG) {
-                    System.out.println("release收到服务器响应消息: " + response.getHey() + " [时间: " +
-                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + pullRequest.getQueueId() + "]");
+
+                    consumeExecutor.submit(() -> {
+                        TreeMap<Long, RemotingCommand> msgTreeMap = pullRequest.getMsgTreeMap();
+                        msgTreeMap.put(response.getConsumerOffset(), response);
+
+                        List<RemotingCommand> msgs = new ArrayList<>();
+                        msgs.add(response);
+                        ConsumeConcurrentlyStatus consumeConcurrentlyStatus = defaultMQPushConsumer.getMessageListener().consumeMessage(msgs, pullRequest);
+                    });
+
                 } else {
                     System.out.println("收到服务器消息: " + response.getHey());
                 }

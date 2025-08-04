@@ -1,5 +1,7 @@
 package org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.consumer;
 
+import org.gnor.rocketmq.common_1.ConsumeConcurrentlyStatus;
+import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.common_1.TopicRouteData;
 
 import java.time.LocalDateTime;
@@ -15,43 +17,14 @@ public class ConsumerClient {
     //private volatile boolean isRunning = false;
     //
 
-    private PullMessageService pullMessageService = new PullMessageService();
-
-    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "MQClientFactoryScheduledThread"));
-
     public static void main(String[] args) throws Exception {
-        new ConsumerClient().run();
+       new DefaultMQPushConsumer((res, context) -> {
+           for (RemotingCommand response : res) {
+               System.out.println("release收到服务器响应消息: " + response.getHey() + " [时间: " +
+                       LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + context.getQueueId() + "]");
+           }
+           return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+       }).start();
     }
-
-    public void run() throws Exception {
-        TopicRouteData topicRouteData = pullMessageService.queryTopicRouteInfo("Topic-T01");
-        String topic = topicRouteData.getTopic();
-        Map<String, Integer> queueTable = topicRouteData.getQueueTable();
-
-        queueTable.forEach((k, v) -> {
-            for (int i = 0; i < v; ++i) {
-                PullRequest pullRequest = new PullRequest();
-                pullRequest.setTopic(topic);
-                pullRequest.setBrokerName(k);
-                pullRequest.setQueueId(i);
-                pullMessageService.executePullRequest(pullRequest);
-
-                this.pullMessageService.rebalanceService.addTopicSubscribeInfo(pullRequest.getTopic(), new MessageQueue( pullRequest.getTopic(), pullRequest.getBrokerName(), pullRequest.getQueueId()));
-            }
-        });
-
-        pullMessageService.sendHeartbeatToBroker(topic);
-        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
-            try {
-                System.out.println("发送心跳：" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                pullMessageService.sendHeartbeatToBroker(topic);
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
-        }, 1000, 10_000, TimeUnit.MILLISECONDS);
-
-        new Thread(pullMessageService).start();
-    }
-
 
 }
