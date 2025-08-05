@@ -88,9 +88,9 @@ public class ConsumeQueueStore {
             return index * ConsumeQueue.CQ_STORE_UNIT_SIZE;
         }
 
-        public void appendMessage(int size, long index, long tagCode) {
+        public void appendMessage(int size, long commitLogPos, long tagCode) {
             writeBuffer.clear();
-            writeBuffer.putLong(convertIndexToCqOffset(index));
+            writeBuffer.putLong(commitLogPos);
             writeBuffer.putInt(size);
             writeBuffer.putLong(tagCode);
             writeBuffer.flip();

@@ -41,7 +41,7 @@ put线程：写入cl后，异步写入cq，在写入后执行notify激活hold线
 - 消费线程池 ✅
 - MQClientFactoryScheduledThread，持续把内存的消费进度定期同步给Broker
 
-### 3. 消息进度如何管理
+### 3. 消息进度如何管理 ✅
 定时同步消费进度，就是ProcessQueue的队首的位点
 针对某个queue维度去管理消费进度，不是针对消息一条一条地管理是否已经消费的，而是针对每个queue直接记录一个位点consumerOffset进行管理
 

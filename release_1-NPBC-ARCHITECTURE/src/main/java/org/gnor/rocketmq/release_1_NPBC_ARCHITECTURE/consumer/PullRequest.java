@@ -8,6 +8,7 @@ public class PullRequest {
     private final MessageQueue messageQueue;
     private final ProcessQueue processQueue;
     private boolean dropped;
+    private long nextOffset;
 
     public PullRequest(MessageQueue messageQueue, ProcessQueue processQueue) {
         this.messageQueue = messageQueue;
@@ -25,5 +26,12 @@ public class PullRequest {
 
     public void setDropped(boolean dropped) {
         this.dropped = dropped;
+    }
+    public long getNextOffset() {
+        return nextOffset;
+    }
+
+    public void setNextOffset(long nextOffset) {
+        this.nextOffset = nextOffset;
     }
 }

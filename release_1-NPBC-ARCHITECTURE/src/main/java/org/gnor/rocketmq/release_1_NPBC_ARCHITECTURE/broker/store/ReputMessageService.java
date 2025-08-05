@@ -6,6 +6,7 @@ import org.gnor.rocketmq.release_1_NPBC_ARCHITECTURE.broker.BrokerStartup;
 import java.util.concurrent.TimeUnit;
 
 public class ReputMessageService extends ServiceThread {
+    //commitLog位点
     protected volatile long reputFromOffset = 0;
     private BrokerStartup brokerStartup;
 

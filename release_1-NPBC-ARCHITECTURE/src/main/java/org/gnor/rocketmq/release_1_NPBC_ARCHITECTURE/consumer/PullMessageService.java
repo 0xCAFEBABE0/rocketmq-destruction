@@ -104,23 +104,20 @@ public class PullMessageService implements Runnable {
                     if (response.getCode() == RemotingCommand.CONSUMER_MSG) {
                         consumeExecutor.submit(() -> {
                             ProcessQueue processQueue = pullRequest.getProcessQueue();
-
                             List<RemotingCommand> msgs = new ArrayList<>();
                             msgs.add(response);
                             boolean b = processQueue.putMessage(msgs);
 
+                            pullRequest.setNextOffset(response.getNextBeginOffset());
                             ConsumeConcurrentlyStatus consumeConcurrentlyStatus = defaultMQPushConsumer.getMessageListener().consumeMessage(msgs, pullRequest);
-
                             if (consumeConcurrentlyStatus == ConsumeConcurrentlyStatus.CONSUME_SUCCESS) {
                                 long offset = processQueue.removeMessage(msgs);
                                 if (offset >= 0 && !pullRequest.isDropped()) {
                                     defaultMQPushConsumer.getOffsetStore().updateOffset(pullRequest.getMessageQueue(), offset);
                                 }
                             }
-
                         });
                     }
-
                 } else {
                     System.out.println("收到服务器消息: " + response.getHey());
                 }
@@ -132,7 +129,6 @@ public class PullMessageService implements Runnable {
                 InvokeCallback.super.operationFail(throwable);
             }
         };
-
 
         try {
             MessageQueue messageQueue = pullRequest.getMessageQueue();
@@ -149,7 +145,7 @@ public class PullMessageService implements Runnable {
             //System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
             //RemotingCommand offsetCmd = this.remotingClient.invokeSync(brokerAddr, getConsumerOffsetCommand, 30000L);
 
-            long consumeOffset = defaultMQPushConsumer.getOffsetStore().readOffset(messageQueue);
+            long commitOffset = defaultMQPushConsumer.getOffsetStore().readOffset(messageQueue);
             // 发送拉取消息请求
             RemotingCommand consumerCmd = new RemotingCommand();
             consumerCmd.setFlag(RemotingCommand.REQUEST_FLAG);
@@ -157,7 +153,8 @@ public class PullMessageService implements Runnable {
             consumerCmd.setConsumerGroup("ConsumerGroup-C01");
             consumerCmd.setTopic(messageQueue.getTopic());
             consumerCmd.setQueueId(messageQueue.getQueueId());
-            consumerCmd.setConsumerOffset(consumeOffset);
+            consumerCmd.setConsumerOffset(pullRequest.getNextOffset());
+            consumerCmd.setCommitOffset(commitOffset);
             consumerCmd.setProperties(JSON.toJSONString(new HashMap<String, String>() {{
                 put("TAG", "TAG-A");
             }}));
@@ -168,6 +165,27 @@ public class PullMessageService implements Runnable {
             //this.executePullRequest(pullRequest);
         }
 
+    }
+
+
+    public void queryRemoteConsumerOffset(MessageQueue messageQueue){
+        RemotingCommand getConsumerOffsetCommand = new RemotingCommand();
+        getConsumerOffsetCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        getConsumerOffsetCommand.setCode(RemotingCommand.QUERY_CONSUMER_OFFSET);
+        getConsumerOffsetCommand.setTopic(messageQueue.getTopic());
+        getConsumerOffsetCommand.setQueueId(messageQueue.getQueueId());
+        getConsumerOffsetCommand.setConsumerGroup("ConsumerGroup-C01");
+
+        System.out.println("发送拉取消息Offset请求: " + getConsumerOffsetCommand.getHey());
+        String brokerName = messageQueue.getBrokerName();
+        String brokerAddr = brokerAddrTable.get(brokerName);
+        try {
+            RemotingCommand offsetCmd = this.remotingClient.invokeSync(brokerAddr, getConsumerOffsetCommand, 30000L);
+            long consumerOffset = offsetCmd.getConsumerOffset();
+            defaultMQPushConsumer.getOffsetStore().updateOffset(messageQueue, consumerOffset);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public boolean sendHeartbeatToBroker(String topic) {

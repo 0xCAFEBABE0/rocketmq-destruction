@@ -111,10 +111,11 @@ public class RebalanceService implements Runnable {
                         System.out.println("doRebalance, add a new mq failed, {}, because mq already exists" + mq);
                     } else {
                         System.out.println("doRebalance, add a new mq, " + mq);
-
                         MessageQueue messageQueue = new MessageQueue(mq.getTopic(), mq.getBrokerName(), mq.getQueueId());
                         PullRequest pullRequest = new PullRequest(messageQueue, new ProcessQueue());
                         pullRequestList.add(pullRequest);
+
+                        this.pullMessageService.queryRemoteConsumerOffset(messageQueue);
                     }
                     //} else {
                     //    System.out.println("doRebalance, add new mq failed, {}" + mq);
