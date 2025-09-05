@@ -10,10 +10,11 @@
 - (9-NPBC-QUEUEID) consumer: 改造为queueId
 - (10-NPBC-CONSUMERMODEL) consumer: 引入消费者线程模型
 - (11-NPBC-LB)producer、consumer: 引入负载均衡、重平衡机制
+- (release_1-NPBC-ARCHITECTURE) 结构改造
+- (12-rNPBC-DELAY) 延迟消息
 
 结构化改造
 - producer：消息重试
-- broker：实现延时消息
 - consumer：引入重试消息
 - broker：实现事务消息
 - broker：引入消息压缩
