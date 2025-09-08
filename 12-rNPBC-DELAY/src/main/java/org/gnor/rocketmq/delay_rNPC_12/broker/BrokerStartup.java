@@ -95,7 +95,27 @@ public class BrokerStartup {
         this.scheduleMessageService = new ScheduleMessageService(this);
     }
 
+    public NettyRemotingClient getRemotingClient() {
+        return remotingClient;
+    }
+
+    public static final String AUTO_CREATE_TOPIC_KEY_TOPIC = "TBW102"; // Will be created at broker when isAutoCreateTopicEnable
+
     public void start() {
+        RemotingCommand remotingCommand = new RemotingCommand();
+        remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        remotingCommand.setCode(RemotingCommand.REGISTER_BROKER);
+        remotingCommand.setBrokerName("Broker-01");
+        remotingCommand.setBrokerAddr("127.0.0.1:9011");
+        remotingCommand.setTopic(AUTO_CREATE_TOPIC_KEY_TOPIC);
+        remotingCommand.setTopicQueueNums(4);
+        try {
+            RemotingCommand responseCmd = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+            System.out.println(responseCmd.getHey());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         this.consumerOffsetManager.load();
 
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
@@ -107,21 +127,6 @@ public class BrokerStartup {
         clientHousekeepingService.scheduleAtFixedRate(() -> {
             this.consumerManager.scanNotActivateChannel();
         }, 1000, 10_000, TimeUnit.MILLISECONDS);
-
-
-        RemotingCommand remotingCommand = new RemotingCommand();
-        remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
-        remotingCommand.setCode(RemotingCommand.REGISTER_BROKER);
-        remotingCommand.setBrokerName("Broker-01");
-        remotingCommand.setBrokerAddr("127.0.0.1:9011");
-        remotingCommand.setTopic("Topic-T01");
-        remotingCommand.setTopicQueueNums(4);
-        try {
-            RemotingCommand responseCmd = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
-            System.out.println(responseCmd.getHey());
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
         try {
             ChannelFuture sync = serverBootstrap.bind().sync();

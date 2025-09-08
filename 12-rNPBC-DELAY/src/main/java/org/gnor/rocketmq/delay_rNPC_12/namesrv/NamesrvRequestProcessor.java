@@ -27,6 +27,9 @@ public class NamesrvRequestProcessor {
     public TopicRouteData getTopicRouteData(String topic) {
         Map<String, String> brokerAddrTable = new HashMap<>();
         Map<String, Integer> queueTable = new HashMap<>();
+        if (!this.topicQueueTable.containsKey(topic)) {
+            return null;
+        }
         for (String brokerName : this.topicQueueTable.getOrDefault(topic, new HashMap<>()).keySet()) {
             brokerAddrTable.put(brokerName, this.brokerAddrTable.get(brokerName));
             queueTable.put(brokerName, this.topicQueueTable.get(topic).get(brokerName));

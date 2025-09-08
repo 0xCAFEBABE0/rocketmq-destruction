@@ -91,7 +91,11 @@ public class NamesrvStartup {
                     case RemotingCommand.GET_ROUTEINFO_BY_TOPIC:
                         TopicRouteData topicRouteData = namesrvRequestProcessor.getTopicRouteData(topic);
                         response.setFlag(RemotingCommand.RESPONSE_FLAG);
-                        response.setTopicRouteData(topicRouteData);
+                        if (null == topicRouteData) {
+                            response.setCode(RemotingCommand.TOPIC_NOT_EXIST);
+                        } else {
+                            response.setTopicRouteData(topicRouteData);
+                        }
                         channelHandlerContext.channel().writeAndFlush(response);
                         break;
                     default:

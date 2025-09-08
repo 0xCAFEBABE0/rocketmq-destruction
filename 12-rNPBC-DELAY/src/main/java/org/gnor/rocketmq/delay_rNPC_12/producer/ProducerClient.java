@@ -19,6 +19,10 @@ public class ProducerClient {
         new ProducerClient().run();
     }
 
+    //private TopicRouteData tryToFindTopicPublishInfo(final String topic) {
+    //
+    //}
+
     public void run() throws Exception {
         RemotingCommand remotingCommand = new RemotingCommand();
         remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
@@ -27,6 +31,17 @@ public class ProducerClient {
         remotingCommand.setHey("Query topic route info from namesrv");
 
         RemotingCommand queryTopicFromNamesrv = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+        if (queryTopicFromNamesrv.getCode() == RemotingCommand.TOPIC_NOT_EXIST) {
+            remotingCommand = new RemotingCommand();
+            remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+            remotingCommand.setCode(RemotingCommand.GET_ROUTEINFO_BY_TOPIC);
+            remotingCommand.setTopic("TBW102");
+            remotingCommand.setHey("Query topic route info from namesrv");
+            queryTopicFromNamesrv = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+
+            queryTopicFromNamesrv.getTopicRouteData().setTopic("Topic-T01"); //偷梁换柱，借用TBW102的路由信息
+        }
+
         TopicRouteData topicRouteData = queryTopicFromNamesrv.getTopicRouteData();
 
         String topic = topicRouteData.getTopic();

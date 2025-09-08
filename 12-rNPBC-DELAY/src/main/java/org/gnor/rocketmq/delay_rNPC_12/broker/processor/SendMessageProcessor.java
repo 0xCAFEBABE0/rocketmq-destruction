@@ -6,7 +6,6 @@ import io.netty.channel.Channel;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.delay_rNPC_12.broker.BrokerStartup;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,6 +18,8 @@ public class SendMessageProcessor {
 
     public void processRequest(final Channel channel, RemotingCommand remotingCommand, RemotingCommand response) {
         String topic = remotingCommand.getTopic();
+        //注册不存在的topic
+        this.createTopicInSendMessageMethod(topic);
 
         //处理延迟消息
         Map<String, String> pMapper = JSONObject.parseObject(remotingCommand.getProperties(), HashMap.class);
@@ -42,5 +43,21 @@ public class SendMessageProcessor {
         response.setHey("Response echo!!!!");
         channel.writeAndFlush(response);
         //requestHoldService.notifyMessageArriving(topic);
+    }
+
+    private void createTopicInSendMessageMethod(String topic) {
+        RemotingCommand registerTopicCmd = new RemotingCommand();
+        registerTopicCmd.setFlag(RemotingCommand.REQUEST_FLAG);
+        registerTopicCmd.setCode(RemotingCommand.REGISTER_BROKER);
+        registerTopicCmd.setBrokerName("Broker-01");
+        registerTopicCmd.setBrokerAddr("127.0.0.1:9011");
+        registerTopicCmd.setTopic(topic);
+        registerTopicCmd.setTopicQueueNums(4);
+        try {
+            RemotingCommand responseCmd = brokerStartup.getRemotingClient().invokeSync("127.0.0.1:9091", registerTopicCmd, 30000L);
+            System.out.println(responseCmd.getHey());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

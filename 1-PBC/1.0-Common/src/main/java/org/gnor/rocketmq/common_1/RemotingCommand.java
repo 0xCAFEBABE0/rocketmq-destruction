@@ -62,6 +62,9 @@ public class RemotingCommand {
     /*release_1版本新增*/
     public static final int UPDATE_CONSUMER_OFFSET = 15;
 
+    /*v12版本新增*/
+    public static final int TOPIC_NOT_EXIST = 17;
+
 
     public void setBrokerName(String brokerName) {
         this.brokerName = brokerName;
