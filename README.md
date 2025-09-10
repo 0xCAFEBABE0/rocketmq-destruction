@@ -12,10 +12,11 @@
 - (11-NPBC-LB)producer、consumer: 引入负载均衡、重平衡机制
 - (release_1-NPBC-ARCHITECTURE) 结构改造
 - (12-rNPBC-DELAY) 延迟消息
+- (13-rNPBC-PRETRY) 生产端重试消息
 
 结构化改造
-- producer：消息重试
 - consumer：引入重试消息
+- broker：顺序消息
 - broker：实现事务消息
 - broker：引入消息压缩
 
