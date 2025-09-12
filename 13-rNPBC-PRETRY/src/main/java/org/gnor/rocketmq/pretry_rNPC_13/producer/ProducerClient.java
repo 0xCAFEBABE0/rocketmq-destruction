@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.common_1.ThreadLocalIndex;
 import org.gnor.rocketmq.common_1.TopicRouteData;
+import org.gnor.rocketmq.pretry_rNPC_13.producer.latency.MQFaultStrategy;
 import org.gnor.rocketmq.pretry_rNPC_13.remoting.NettyRemotingClient;
 import org.gnor.rocketmq.pretry_rNPC_13.remoting.RemotingSysResponseCode;
 import org.gnor.rocketmq.pretry_rNPC_13.remoting.ResponseCode;
@@ -12,8 +13,7 @@ import java.util.*;
 
 public class ProducerClient {
     private NettyRemotingClient remotingClient = new NettyRemotingClient();
-
-    private ThreadLocalIndex sendQueue = new ThreadLocalIndex();
+    private MQFaultStrategy mqFaultStrategy = new MQFaultStrategy();
 
     public static void main(String[] args) throws Exception {
         new ProducerClient().run();
@@ -87,7 +87,7 @@ public class ProducerClient {
         for (; times < timesTotal; ++times) {
             String lastBrokerName = null == mq ? null : mq.getBrokerName();
 
-            mq = selectOnMessageQueue(mqList, lastBrokerName);
+            mq = mqFaultStrategy.selectOnMessageQueue(mqList, lastBrokerName);
             brokersSent[times] = mq.getBrokerName();
             //超时
             beginTimestampPrev = System.currentTimeMillis();
@@ -99,6 +99,8 @@ public class ProducerClient {
             long curTimeout = timeout - costTime;
 
             sendResult = sendKernelImpl(remotingCommand, mq, brokerAddrTable);
+            endTimestamp = System.currentTimeMillis();
+            mqFaultStrategy.updateFaultItem(mq.getBrokerName(), endTimestamp -beginTimestampPrev + 5000, true);
             if (sendResult.getSendStatus() != SendStatus.SEND_OK) {
                 continue;
             }
@@ -121,19 +123,7 @@ public class ProducerClient {
         throw new RuntimeException("No route info of this topic: " + mq.getTopic());
     }
 
-    private MessageQueue selectOnMessageQueue(List<MessageQueue> mqList, String lastBrokerName) {
-        MessageQueue mq;
-        for (int i = 0; i < mqList.size(); ++i) {
-            int index = Math.abs(this.sendQueue.incrementAndGet() % mqList.size());
-            mq = mqList.get(index);
-            if (null != lastBrokerName && lastBrokerName.equals(mq.getBrokerName())) {
-                continue;
-            }
-            return mq;
-        }
-        int index = Math.abs(this.sendQueue.incrementAndGet() % mqList.size());
-        return mqList.get(index);
-    }
+
 
     private SendResult sendKernelImpl(RemotingCommand remotingCommand, MessageQueue mq, Map<String, String> brokerAddrTable) throws InterruptedException {
         String brokerName = mq.getBrokerName();
