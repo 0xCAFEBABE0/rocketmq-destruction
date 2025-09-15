@@ -2,6 +2,7 @@ package org.gnor.rocketmq.common_1;
 
 import com.alibaba.fastjson2.JSON;
 import io.netty.buffer.ByteBuf;
+import org.gnor.rocketmq.common_1.protocol.header.CommandCustomHeader;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -10,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since 2025/7/2
  */
 public class RemotingCommand {
+    private transient CommandCustomHeader customHeader;
     private int flag = REQUEST_FLAG;
     private int code = PRODUCER_MSG;
     private String hey;
@@ -64,6 +66,9 @@ public class RemotingCommand {
 
     /*v12版本新增*/
     public static final int TOPIC_NOT_EXIST = 17;
+
+    /*v14版本新增*/
+    public static final int CONSUMER_SEND_MSG_BACK = 36;
 
 
     public void setBrokerName(String brokerName) {
@@ -192,6 +197,10 @@ public class RemotingCommand {
 
     public void setOpaque(int opaque) {
         this.opaque = opaque;
+    }
+
+    public void setCustomHeader(CommandCustomHeader header) {
+        this.customHeader = header;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {

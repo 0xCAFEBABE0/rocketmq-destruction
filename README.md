@@ -13,9 +13,9 @@
 - (release_1-NPBC-ARCHITECTURE) 结构改造
 - (12-rNPBC-DELAY) 延迟消息
 - (13-rNPBC-PRETRY) 生产端重试消息
+- (14-rNPBC-CRETRY) 消费端重试
 
 结构化改造
-- consumer：引入重试消息
 - broker：顺序消息
 - broker：实现事务消息
 - broker：引入消息压缩
@@ -55,63 +55,6 @@
 - 引入长轮询机制，解决大量无用功问题。
 需要引入通报消息到达的机制（RequestHoldService），在两种情境下触发，1.定时轮询hold住的请求 2.产生消息时；底层都调用notifyMessageArriving方法，消费请求到达时，在SuspendRequest里塞入channel。
 ![img.png](doc/evolution/evo_02.png)
-
-### 3-PBC-TOPIC# rocketmq-destruction
-- (1-PBC) broker:本地list存储JSON，consumer：定时轮询拉取消息；
-- (2-PBC-LO) consumer、broker：改造为长连接获取消息
-- (3-PBC-TOPIC) producer、consumer、broker：引入topic，多消费者管理
-- (4-PBC-FILE) producer、consumer、broker：改为本地文件存储，修改为rocketmq的消息协议，引入commitLog
-- (5-PBC-CONSUMEQUEUE) broker：引入consumeQueue
-- (6-PBC-OFFSET) consumer、broker：消费进度管理
-- (7-PBC-TAG) broker：引入tag，增加服务端消息过滤
-- (8-NPBC-NAMESRV) nameserver：引入nameserver
-- (9-NPBC-QUEUEID) consumer: 改造为queueId
-- (10-NPBC-CONSUMERMODEL) consumer: 引入消费者线程模型
-- (11-NPBC-LB)producer、consumer: 引入负载均衡、重平衡机制
-- (release_1-NPBC-ARCHITECTURE) 结构改造
-- (12-rNPBC-DELAY) 延迟消息
-
-结构化改造
-- producer：消息重试
-- consumer：引入重试消息
-- broker：实现事务消息
-- broker：引入消息压缩
-
-- broker: Local list stores obj, consumer: polls regularly to pull messages;
-- consumer: Modify to long connection to get messages.
-- broker: introduce topic.
-- broker: change to local file storage,modify to the message protocol of rocketmq, introduce commitLog.
-- consumer: introduce consumer thread model, consumer schedule management、consumeQueue
-- nameserver: introduce nameserver.
-- producers and consumers: Introducing load balancing.
-- producer and consumer: introduce message retry.
-- broker: Implement server level message filtering.
-- broker: Implement transaction messages.
-- broker: Implement delay messages.
-- broker: Introducing message compression.
-
-消息中间件的设计，围绕两个核心问题展开
-- 存储的可靠性
-- 投递的可靠性
-  保证at-least-once语义
-
-### 1-PBC
-服务端：
-- 消息存储在本地内存，故障易丢失；
-- 为了保证消费实时性，消费轮询的频次足够密，服务端产生太多无用功；
-- 所有的消息杂糅在一起，维护成本高；
-- 无水平扩展能力，应对大批量的消息生产与消费时，无法提供低延时、高可靠的服务能力；
-
-客户端：
-- 最终需要寄生在服务内部，消费采用定时轮询，消耗太多宿主资源
-- 单线程串行生产与消费，面对大批量消息，延时高资源消耗大
-- 消费时全量拉取，无法区分仅业务所需的消息
-  ![img.png](doc/evolution/evo_01.png)
-
-### 2-PBC-LO
-- 引入长轮询机制，解决大量无用功问题。
-  需要引入通报消息到达的机制（RequestHoldService），在两种情境下触发，1.定时轮询hold住的请求 2.产生消息时；底层都调用notifyMessageArriving方法，消费请求到达时，在SuspendRequest里塞入channel。
-  ![img.png](doc/evolution/evo_02.png)
 
 ### 3-PBC-TOPIC
 - 引入topic维度进行消息分类，方便维护消息
@@ -183,3 +126,9 @@ cq结构中新增8字节的tagCode，co还是保持topic结构，若cq未找到�
 - broker端引入queueId，提高横向扩展能力。
 commitLog新增queueId存入文件，cq按queueId进行二级分组，一级依旧为topic
 ![img.png](doc/evolution/evo_09.png)
+
+
+### 13-rNPBC-PRETRY
+- 生产端重试机制，类似缓存设计，在客户端维护table
+- 若未开启sendLatencyFaultEnable故障延迟，则规避上次失败的broker
+- 开启故障延迟后，对之前失败的broker，动态计算规避时间
