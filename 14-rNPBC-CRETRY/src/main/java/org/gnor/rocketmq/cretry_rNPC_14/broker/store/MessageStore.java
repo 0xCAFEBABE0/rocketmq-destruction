@@ -84,7 +84,9 @@ public class MessageStore {
         private final String body;
         private final String status;
         private int queueId;
+        private int reconsumeTimes;
         private Map<String, String> properties;
+        private Long commitLogOffset;
 
         public StoredMessage(String topic, String body, String status, int queueId) {
             this.topic = topic;
@@ -99,6 +101,16 @@ public class MessageStore {
             this.status = status;
             this.queueId = queueId;
             this.properties = properties;
+        }
+
+        public StoredMessage(String topic, String body, String status, int queueId, Map<String, String> properties, int reconsumeTimes, Long commitLogOffset) {
+            this.topic = topic;
+            this.body = body;
+            this.status = status;
+            this.queueId = queueId;
+            this.properties = properties;
+            this.reconsumeTimes = reconsumeTimes;
+            this.commitLogOffset = commitLogOffset;
         }
 
         public String getTopic() {
@@ -126,6 +138,13 @@ public class MessageStore {
         public void setQueueId(int queueId) {
             this.queueId = queueId;
         }
+        public int getReconsumeTimes() {
+            return reconsumeTimes;
+        }
+        public Long getCommitLogOffset() {
+            return this.commitLogOffset;
+        }
+
     }
 
     static {
@@ -157,6 +176,7 @@ public class MessageStore {
                 + 8 //PHYSICALOFFSET
                 + 4 //QUEUEID
                 + 8 //STORETIMESTAMP
+                + 4 //RECONSUMETIMES
                 + 4 + (Math.max(bodyLength, 0)) //BODY
                 + 2 + topicLength //TOPIC
                 + 2 + (Math.max(propertiesLength, 0)) //PROPERTIES
@@ -173,7 +193,7 @@ public class MessageStore {
         return consumeQueueStore.hasMessages(topic, pullFromThisOffset, queueId);
     }
 
-    public void encode(String topic, String body, String properties, int queueId, int currentPos) {
+    public void encode(String topic, String body, String properties, int queueId, int currentPos, int reconsumeTimes) {
         byte[] topicData = topic.getBytes(StandardCharsets.UTF_8);
         int topicLength = topicData.length;
 
@@ -190,6 +210,7 @@ public class MessageStore {
         writeBuffer.putLong(currentPos); //PHYSICALOFFSET, need update later
         writeBuffer.putInt(queueId); //QUEUEID, need update later
         writeBuffer.putLong(System.currentTimeMillis()); //STORETIMESTAMP, need update later
+        writeBuffer.putInt(reconsumeTimes);
         writeBuffer.putInt(bodyLength);
         writeBuffer.put(bodyData);
         writeBuffer.putShort((short) topicLength);
@@ -200,9 +221,9 @@ public class MessageStore {
         System.out.println("msgLength: " + msgLength);
     }
 
-    public void appendMessage(String topic, String body, String properties, int queueId) {
+    public void appendMessage(String topic, String body, String properties, int queueId, int reconsumeTimes) {
         int currentPos = WROTE_POSITION_UPDATER.get(this);
-        encode(topic, body, properties, queueId, currentPos);
+        encode(topic, body, properties, queueId, currentPos, reconsumeTimes);
 
         // Position the mapped buffer to the current write position
         mappedByteBuffer.position(currentPos);
@@ -247,6 +268,7 @@ public class MessageStore {
         long physicOffset = readBuffer.getLong();
         int queueId = readBuffer.getInt();
         long storeTimestamp = readBuffer.getLong();
+        int reconsumeTimes = readBuffer.getInt();
         int bodySize = readBuffer.getInt();
         byte[] bodyData = new byte[bodySize];
         readBuffer.get(bodyData);
@@ -264,6 +286,7 @@ public class MessageStore {
         System.out.println("physicOffset: " + physicOffset);
         System.out.println("queueId: " + queueId);
         System.out.println("storeTimestamp: " + storeTimestamp);
+        System.out.println("reconsumeTimes: " + reconsumeTimes);
         System.out.println("bodySize: " + bodySize);
         System.out.println("body: " + new String(bodyData, StandardCharsets.UTF_8));
         System.out.println("topicSize: " + topicSize);
@@ -272,7 +295,20 @@ public class MessageStore {
         System.out.println("properties: " + propertiesMap);
         System.out.println("---");
 
-        return new StoredMessage(new String(topicData), new String(bodyData), "FOUND", queueId, propertiesMap);
+        return new StoredMessage(new String(topicData), new String(bodyData), "FOUND", queueId, propertiesMap, reconsumeTimes, physicOffset);
+    }
+
+    public StoredMessage lookMessageByOffset(int commitLogOffset) {
+        int msgTotalSize = this.getMsgTotalSize(commitLogOffset, 4);
+        return getMessage(commitLogOffset, msgTotalSize);
+    }
+
+    public int getMsgTotalSize(int commitLogOffset, int size) {
+        ByteBuffer byteBuffer = this.mappedByteBuffer.duplicate();
+        byteBuffer.position(commitLogOffset);
+        ByteBuffer byteBufferNew = byteBuffer.slice();
+        byteBufferNew.limit(size);
+        return byteBufferNew.getInt();
     }
 
     /**
@@ -326,7 +362,7 @@ public class MessageStore {
         return new SelectMappedBufferResult(pos, byteBufferNew, size);
     }
 
-    String levelString = "1s 5s 10s 30s";
+    String levelString = "1s 5s 10s 30s 1m 5m 10m 30m";
     private int maxDelayLevel;
     private final ConcurrentSkipListMap<Integer /*level*/, Long /*delay millis*/> delayLevelTable = new ConcurrentSkipListMap<>();
     public void parseDelayLevel() {
@@ -357,6 +393,7 @@ public class MessageStore {
         long physicOffset = readBuffer.getLong();
         int queueId = readBuffer.getInt();
         long storeTimestamp = readBuffer.getLong();
+        int reconsumeTimes = readBuffer.getInt();
         int bodySize = readBuffer.getInt();
         byte[] bodyData = new byte[bodySize];
         readBuffer.get(bodyData);
@@ -462,8 +499,8 @@ public class MessageStore {
 
     public static void main(String[] args) {
         MessageStore messageStore = new MessageStore(new ConsumerOffsetManager());
-        messageStore.appendMessage("Topic-test", "aaaHello.", "", 0);
-        messageStore.appendMessage("Topic-test", "2aaaHello.", "", 0);
+        messageStore.appendMessage("Topic-test", "aaaHello.", "", 0, 0);
+        messageStore.appendMessage("Topic-test", "2aaaHello.", "", 0, 0);
 
         messageStore.getMessage(0, 37);
         messageStore.getMessage(37, 38);

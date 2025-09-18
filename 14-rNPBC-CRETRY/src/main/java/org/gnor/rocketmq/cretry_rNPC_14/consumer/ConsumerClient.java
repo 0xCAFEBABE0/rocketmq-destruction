@@ -20,10 +20,10 @@ public class ConsumerClient {
     public static void main(String[] args) throws Exception {
        new DefaultMQPushConsumer("TeGroup-C01", (res, context) -> {
            for (RemotingCommand response : res) {
-               System.out.println("release收到服务器响应消息: " + response.getHey() + " [时间: " +
+               System.out.println(response.getTopic() + "收到服务器响应消息: " + response.getHey() + " [时间: " +
                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "]" + " [队列: " + context.getMessageQueue().getQueueId() + "]");
            }
-           return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+           return ConsumeConcurrentlyStatus.RECONSUME_LATER;
        }).start();
     }
 

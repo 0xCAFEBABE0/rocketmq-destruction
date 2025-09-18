@@ -137,7 +137,7 @@ public class ProducerClient {
         remotingCommand.setHey("Hello, Producer-01 Server!");
         remotingCommand.setProperties(JSON.toJSONString(new HashMap<String, String >() {{
             put("TAG", "TAG-A");
-            put("DELAY", "2");
+            //put("DELAY", "2");
         }}));
         RemotingCommand response = this.remotingClient.invokeSync(brokerAddr, remotingCommand, 30000L);
 

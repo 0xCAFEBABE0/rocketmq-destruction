@@ -102,7 +102,7 @@ public class PullMessageService implements Runnable {
                     if (response.getCode() == RemotingCommand.CONSUMER_MSG) {
                         consumeExecutor.submit(() -> {
 
-                            tryResetPopRetryTopic(response, defaultMQPushConsumer.getConsumerGroup());
+                            //tryResetPopRetryTopic(response, defaultMQPushConsumer.getConsumerGroup());
 
                             ProcessQueue processQueue = pullRequest.getProcessQueue();
                             List<RemotingCommand> msgs = new ArrayList<>();
@@ -126,6 +126,8 @@ public class PullMessageService implements Runnable {
                                 requestHeader.setOriginMsgId("");
                                 requestHeader.setMaxReconsumeTimes(defaultMQPushConsumer.getMaxReconsumeTimes());
 
+                                request.setHey(response.getHey());
+                                request.setCommitOffset(response.getCommitOffset());
                                 request.setFlag(RemotingCommand.REQUEST_FLAG);
                                 request.setCode(RemotingCommand.CONSUMER_SEND_MSG_BACK);
                                 MessageQueue messageQueue = pullRequest.getMessageQueue();

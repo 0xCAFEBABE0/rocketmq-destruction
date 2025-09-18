@@ -33,7 +33,7 @@ public class SendMessageProcessor {
             remotingCommand.setQueueId(delayTimeLevel - 1);
         }
 
-        this.brokerStartup.getMessageStore().appendMessage(remotingCommand.getTopic(), remotingCommand.getHey(), JSON.toJSONString(pMapper), remotingCommand.getQueueId());
+        this.brokerStartup.getMessageStore().appendMessage(remotingCommand.getTopic(), remotingCommand.getHey(), JSON.toJSONString(pMapper), remotingCommand.getQueueId(), 0);
         /*迭代为文件存储*/
         //List<RemotingCommand> storeList = storeTopicRecord.getOrDefault(topic, new ArrayList<>());
         //storeList.add(remotingCommand);

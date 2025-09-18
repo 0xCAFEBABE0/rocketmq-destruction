@@ -19,7 +19,7 @@ public class ScheduleMessageService {
     private static final long FIRST_DELAY_TIME = 1000L;
     private static final long DELAY_FOR_A_WHILE = 100L;
     private int maxDelayLevel;
-    String levelString = "1s 5s 10s 30s";
+    String levelString = "1s 5s 10s 30s 1m 5m 10m 30m";
 
     public static final String RMQ_SYS_SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
 
@@ -115,7 +115,7 @@ public class ScheduleMessageService {
             MessageStore.StoredMessage storedMessage = brokerStartup.getMessageStore().getMessage(offsetPy, sizePy);
 
             storedMessage = messageTimeUp(storedMessage);
-            brokerStartup.getMessageStore().appendMessage(storedMessage.getTopic(), storedMessage.getBody(), JSON.toJSONString(storedMessage.getProperties()), storedMessage.getQueueId());
+            brokerStartup.getMessageStore().appendMessage(storedMessage.getTopic(), storedMessage.getBody(), JSON.toJSONString(storedMessage.getProperties()), storedMessage.getQueueId(), 0);
             offsetTable.put(delayLevel, nextOffset);
 
             this.scheduleNextTimerTask(nextOffset, DELAY_FOR_A_WHILE);

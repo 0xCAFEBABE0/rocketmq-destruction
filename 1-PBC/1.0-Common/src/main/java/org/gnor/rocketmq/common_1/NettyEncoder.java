@@ -18,6 +18,8 @@ public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
     @Override
     public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out) {
         try {
+            remotingCommand.makeCustomHeaderToNet();
+
             byte[] commandData = JSON.toJSONString(remotingCommand).getBytes(StandardCharsets.UTF_8);
             int headerLength = commandData.length;
             int totalLength = 4 + commandData.length; // header长度字段 + header + body

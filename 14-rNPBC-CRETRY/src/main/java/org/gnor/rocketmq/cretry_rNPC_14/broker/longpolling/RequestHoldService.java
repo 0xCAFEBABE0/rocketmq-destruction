@@ -95,6 +95,7 @@ public class RequestHoldService extends ServiceThread {
                 RemotingCommand msgArrivingCmd = new RemotingCommand();
                 msgArrivingCmd.setCode( RemotingCommand.CONSUMER_MSG);
                 msgArrivingCmd.setOpaque(sr.getOpaque());
+                msgArrivingCmd.setCommitOffset(storedMessage.getCommitLogOffset());
                 //TODO@ch
                 msgArrivingCmd.setNextBeginOffset(sr.getPullFromThisOffset() + 1);
                 msgArrivingCmd.setConsumerOffset(sr.getPullFromThisOffset());

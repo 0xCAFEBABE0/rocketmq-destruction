@@ -14,6 +14,7 @@ import org.gnor.rocketmq.common_1.*;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.client.ConsumerManager;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.longpolling.RequestHoldService;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.processor.PullMessageProcessor;
+import org.gnor.rocketmq.cretry_rNPC_14.broker.processor.SendBackProcessor;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.processor.SendMessageProcessor;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.schedule.ScheduleMessageService;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.store.ConsumerOffsetManager;
@@ -70,6 +71,9 @@ public class BrokerStartup {
     /*v12版本新增：消息延迟机制*/
     private ScheduleMessageService scheduleMessageService;
 
+    /*v14 新增消费重试*/
+    private SendBackProcessor sendBackProcessor;
+
     public MessageStore getMessageStore() {
         return messageStore;
     }
@@ -93,6 +97,8 @@ public class BrokerStartup {
         this.sendMessageProcessor = new SendMessageProcessor(this);
         this.reputMessageService = new ReputMessageService(this);
         this.scheduleMessageService = new ScheduleMessageService(this);
+
+        this.sendBackProcessor = new SendBackProcessor(this);
     }
 
     public NettyRemotingClient getRemotingClient() {
@@ -215,7 +221,7 @@ public class BrokerStartup {
                         channelHandlerContext.channel().writeAndFlush(response);
                         break;
                     case RemotingCommand.CONSUMER_SEND_MSG_BACK:
-
+                        sendBackProcessor.processRequest(channelHandlerContext.channel(), remotingCommand);
                         break;
                     default:
                         break;

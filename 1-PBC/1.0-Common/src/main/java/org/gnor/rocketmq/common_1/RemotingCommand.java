@@ -2,8 +2,13 @@ package org.gnor.rocketmq.common_1;
 
 import com.alibaba.fastjson2.JSON;
 import io.netty.buffer.ByteBuf;
+import org.gnor.rocketmq.common_1.annotation.CFNotNull;
 import org.gnor.rocketmq.common_1.protocol.header.CommandCustomHeader;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -12,6 +17,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class RemotingCommand {
     private transient CommandCustomHeader customHeader;
+    private transient CommandCustomHeader cachedHeader;
+    private Map<String, String> extFields;
+    private static final Map<Class<? extends CommandCustomHeader>, Field[]> CLASS_HASH_MAP = new HashMap<>();
+    private static final Map<Field, Boolean> NULLABLE_FIELD_CACHE = new HashMap<>();
+    private static final Map<Class, String> CANONICAL_NAME_CACHE = new HashMap<>();
+    private static final String STRING_CANONICAL_NAME = String.class.getCanonicalName();
+    private static final String DOUBLE_CANONICAL_NAME_1 = Double.class.getCanonicalName();
+    private static final String DOUBLE_CANONICAL_NAME_2 = double.class.getCanonicalName();
+    private static final String INTEGER_CANONICAL_NAME_1 = Integer.class.getCanonicalName();
+    private static final String INTEGER_CANONICAL_NAME_2 = int.class.getCanonicalName();
+    private static final String LONG_CANONICAL_NAME_1 = Long.class.getCanonicalName();
+    private static final String LONG_CANONICAL_NAME_2 = long.class.getCanonicalName();
+    private static final String BOOLEAN_CANONICAL_NAME_1 = Boolean.class.getCanonicalName();
+    private static final String BOOLEAN_CANONICAL_NAME_2 = boolean.class.getCanonicalName();
+
+
     private int flag = REQUEST_FLAG;
     private int code = PRODUCER_MSG;
     private String hey;
@@ -138,9 +159,11 @@ public class RemotingCommand {
     public Long getNextBeginOffset() {
         return nextBeginOffset;
     }
+
     public void setNextBeginOffset(Long nextBeginOffset) {
         this.nextBeginOffset = nextBeginOffset;
     }
+
     public String getConsumerGroup() {
         return consumerGroup;
     }
@@ -168,6 +191,7 @@ public class RemotingCommand {
     public int getTopicQueueNums() {
         return topicQueueNums;
     }
+
     public TopicRouteData getTopicRouteData() {
         return topicRouteData;
     }
@@ -175,6 +199,7 @@ public class RemotingCommand {
     public void setTopicRouteData(TopicRouteData topicRouteData) {
         this.topicRouteData = topicRouteData;
     }
+
     public int getQueueId() {
         return queueId;
     }
@@ -201,6 +226,13 @@ public class RemotingCommand {
 
     public void setCustomHeader(CommandCustomHeader header) {
         this.customHeader = header;
+    }
+
+    public Map<String, String> getExtFields() {
+        return this.extFields;
+    }
+    public void setExtFields(Map<String, String> extFields) {
+        this.extFields = extFields;
     }
 
     private static RemotingCommand headerDecode(ByteBuf byteBuffer, int len, int type) {
@@ -241,5 +273,148 @@ public class RemotingCommand {
         return cmd;
     }
 
+    public void makeCustomHeaderToNet() {
+        if (this.customHeader != null) {
+            Field[] fields = getClazzFields(customHeader.getClass());
+            if (null == this.extFields) {
+                this.extFields = new HashMap<>();
+            }
 
+            for (Field field : fields) {
+                if (Modifier.isStatic(field.getModifiers())) {
+                    continue;
+                }
+                String name = field.getName();
+                if (name.startsWith("this")) {
+                    continue;
+                }
+                Object value = null;
+                try {
+                    field.setAccessible(true);
+                    value = field.get(this.customHeader);
+                } catch (Exception e) {
+                    System.out.println("makeCustomHeaderToNet Exception");
+                }
+
+                if (value != null) {
+                    this.extFields.put(name, value.toString());
+                }
+            }
+        }
+    }
+
+    //make it able to test
+    Field[] getClazzFields(Class<? extends CommandCustomHeader> classHeader) {
+        Field[] field = CLASS_HASH_MAP.get(classHeader);
+        if (null != field) {
+            return field;
+        }
+
+        Set<Field> fieldList = new HashSet<>();
+        for (Class className = classHeader; className != Object.class; className = className.getSuperclass()) {
+            Field[] fields = className.getDeclaredFields();
+            fieldList.addAll(Arrays.asList(fields));
+        }
+        field = fieldList.toArray(new Field[0]);
+        synchronized (CLASS_HASH_MAP) {
+            CLASS_HASH_MAP.put(classHeader, field);
+        }
+        return field;
+    }
+
+
+    public <T extends CommandCustomHeader> T decodeCommandCustomHeader(Class<T> classHeader) {
+        return decodeCommandCustomHeader(classHeader, false);
+    }
+
+
+    public <T extends CommandCustomHeader> T decodeCommandCustomHeader(Class<T> classHeader, boolean isCached) {
+        if (isCached && cachedHeader != null) {
+            return classHeader.cast(cachedHeader);
+        }
+        cachedHeader = decodeCommandCustomHeaderDirectly(classHeader, true);
+        if (cachedHeader == null) {
+            return null;
+        }
+        return classHeader.cast(cachedHeader);
+    }
+
+    public <T extends CommandCustomHeader> T decodeCommandCustomHeaderDirectly(Class<T> classHeader, boolean useFastEncode) {
+        T objectHeader;
+        try {
+            objectHeader = classHeader.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            return null;
+        }
+        if (null == this.extFields) {
+            return objectHeader;
+        }
+
+        Field[] fields = getClazzFields(classHeader);
+        for (Field field : fields) {
+            if (!Modifier.isStatic(field.getModifiers())) {
+                String fieldName = field.getName();
+                if (!fieldName.startsWith("this")) {
+                    try {
+                        String value = this.extFields.get(fieldName);
+                        if (null == value) {
+                            if (!isFieldNullable(field)) {
+                                throw new RuntimeException("the custom field <" + fieldName + "> is null");
+                            }
+                            continue;
+                        }
+
+                        field.setAccessible(true);
+                        String type = getCanonicalName(field.getType());
+                        Object valueParsed;
+
+                        if (type.equals(STRING_CANONICAL_NAME)) {
+                            valueParsed = value;
+                        } else if (type.equals(INTEGER_CANONICAL_NAME_1) || type.equals(INTEGER_CANONICAL_NAME_2)) {
+                            valueParsed = Integer.parseInt(value);
+                        } else if (type.equals(LONG_CANONICAL_NAME_1) || type.equals(LONG_CANONICAL_NAME_2)) {
+                            valueParsed = Long.parseLong(value);
+                        } else if (type.equals(BOOLEAN_CANONICAL_NAME_1) || type.equals(BOOLEAN_CANONICAL_NAME_2)) {
+                            valueParsed = Boolean.parseBoolean(value);
+                        } else if (type.equals(DOUBLE_CANONICAL_NAME_1) || type.equals(DOUBLE_CANONICAL_NAME_2)) {
+                            valueParsed = Double.parseDouble(value);
+                        } else {
+                            throw new RuntimeException("the custom field <" + fieldName + "> type is not supported");
+                        }
+
+                        field.set(objectHeader, valueParsed);
+
+                    } catch (Throwable e) {
+                        System.out.println("Failed field [{" + fieldName + "}] decoding");
+                    }
+                }
+            }
+        }
+
+        objectHeader.checkFields();
+
+        return objectHeader;
+    }
+
+    private boolean isFieldNullable(Field field) {
+        if (!NULLABLE_FIELD_CACHE.containsKey(field)) {
+            Annotation annotation = field.getAnnotation(CFNotNull.class);
+            synchronized (NULLABLE_FIELD_CACHE) {
+                NULLABLE_FIELD_CACHE.put(field, annotation == null);
+            }
+        }
+        return NULLABLE_FIELD_CACHE.get(field);
+    }
+
+    private String getCanonicalName(Class clazz) {
+        String name = CANONICAL_NAME_CACHE.get(clazz);
+
+        if (name == null) {
+            name = clazz.getCanonicalName();
+            synchronized (CANONICAL_NAME_CACHE) {
+                CANONICAL_NAME_CACHE.put(clazz, name);
+            }
+        }
+        return name;
+    }
 }

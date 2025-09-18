@@ -15,6 +15,9 @@ public class ConsumeQueueStore {
     protected final ConcurrentMap<String /*topic*/, Map<Integer /*queueId*/, ConsumeQueue>> consumeQueueTable = new ConcurrentHashMap<>();
 
     public boolean hasMessages(String topic, long pullFromThisOffset, int queueId) {
+        if (!consumeQueueTable.containsKey(topic)) {
+            return false;
+        }
         ConsumeQueue consumeQueue = consumeQueueTable.get(topic).get(queueId);
         return null != consumeQueue && pullFromThisOffset < consumeQueue.wrotePosition;
     }
