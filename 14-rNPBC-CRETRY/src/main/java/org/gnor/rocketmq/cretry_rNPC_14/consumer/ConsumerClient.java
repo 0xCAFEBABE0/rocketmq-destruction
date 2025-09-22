@@ -36,7 +36,7 @@ public class ConsumerClient {
            if (i.getAndDecrement() < 0) {
                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
            }
-           return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+           return ConsumeConcurrentlyStatus.RECONSUME_LATER;
        }).start();
     }
 

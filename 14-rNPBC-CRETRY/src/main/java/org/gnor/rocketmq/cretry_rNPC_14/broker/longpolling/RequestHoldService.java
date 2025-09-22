@@ -79,6 +79,7 @@ public class RequestHoldService extends ServiceThread {
                 RemotingCommand msgNotFound = new RemotingCommand();
                 msgNotFound.setHey("Message not found!");
                 msgNotFound.setFlag(RemotingCommand.RESPONSE_FLAG);
+                msgNotFound.setCode( RemotingCommand.CONSUMER_MSG);
                 msgNotFound.setOpaque(sr.getOpaque());
                 sr.getClientChannel().writeAndFlush(msgNotFound);
                 it.remove();
@@ -96,6 +97,7 @@ public class RequestHoldService extends ServiceThread {
                 msgArrivingCmd.setCode( RemotingCommand.CONSUMER_MSG);
                 msgArrivingCmd.setOpaque(sr.getOpaque());
                 msgArrivingCmd.setCommitOffset(storedMessage.getCommitLogOffset());
+                msgArrivingCmd.setQueueId(queueId);
                 //TODO@ch
                 msgArrivingCmd.setNextBeginOffset(sr.getPullFromThisOffset() + 1);
                 msgArrivingCmd.setConsumerOffset(sr.getPullFromThisOffset());

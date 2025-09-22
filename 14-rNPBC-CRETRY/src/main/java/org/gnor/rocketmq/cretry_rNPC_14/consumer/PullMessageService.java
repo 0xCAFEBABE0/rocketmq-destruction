@@ -52,7 +52,7 @@ public class PullMessageService implements Runnable {
 
     @Override
     public void run() {
-        new Thread(rebalanceService).start();
+        //new Thread(rebalanceService).start();
         while (true) {
             try {
                 PullRequest take = this.pullRequestQueue.take();
@@ -102,7 +102,11 @@ public class PullMessageService implements Runnable {
                 if (response.getFlag() == RemotingCommand.RESPONSE_FLAG) {
 
                     if (response.getCode() == RemotingCommand.CONSUMER_MSG) {
-                        consumeExecutor.submit(() -> {
+                        //consumeExecutor.submit(() -> {
+                            if ("Message not found!".equalsIgnoreCase(response.getHey())) {
+                                executePullRequest(pullRequest);
+                                return;
+                            }
 
                             //tryResetPopRetryTopic(response, defaultMQPushConsumer.getConsumerGroup());
 
@@ -148,11 +152,10 @@ public class PullMessageService implements Runnable {
                             if (offset >= 0 && !pullRequest.isDropped()) {
                                 defaultMQPushConsumer.getOffsetStore().updateOffset(pullRequest.getMessageQueue(), offset);
                             }
-
-                        });
+                            executePullRequest(pullRequest);
+                        //});
                     }
                 }
-                executePullRequest(pullRequest);
             }
 
             @Override
