@@ -52,11 +52,11 @@ public class RequestHoldService extends ServiceThread {
 
     public void notifyMessageArriving() throws InterruptedException {
         for (String k : this.suspendRequests.keySet()) {
-            this.notifyMessageArriving(k);
+            this.notifyMessageArriving(k, "RUN");
         }
     }
 
-    public void notifyMessageArriving(String key) throws InterruptedException {
+    public void notifyMessageArriving(String key, String source) throws InterruptedException {
         List<SuspendRequest> suspendRequests = this.suspendRequests.get(key);
         if (null == suspendRequests || suspendRequests.isEmpty()) {
             System.out.println("没有请求需要唤醒。");
@@ -108,6 +108,7 @@ public class RequestHoldService extends ServiceThread {
                     msgArrivingCmd.setTopic(storedMessage.getTopic());
                     msgArrivingCmd.setFlag(RemotingCommand.RESPONSE_FLAG);
                 }
+                System.out.println("notifyMessageArriving: key:" + key + ",msg:" + JSONObject.toJSONString(msgArrivingCmd) + ", source:" + source);
                 sr.getClientChannel().writeAndFlush(msgArrivingCmd).sync();
                 it.remove();
             }

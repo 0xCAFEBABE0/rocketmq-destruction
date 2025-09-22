@@ -238,7 +238,7 @@ public class MessageStore {
         //topicMessageIndex.computeIfAbsent(topic, k -> new ArrayList<>()).add(metadata);
 
         this.mappedByteBuffer.force();
-        System.out.println("Appended message at position: " + currentPos + ", length: " + msgLength);
+        System.out.println("Appended message at position: " + currentPos + ", length: " + msgLength + ", topic: " + topic + ", properties: " + properties + ", queueId: " + queueId + ", reconsumeTimes: " + reconsumeTimes);
 
         //v5版本新增：consumeQueue
         //v7版本新增：tag
@@ -362,7 +362,7 @@ public class MessageStore {
         return new SelectMappedBufferResult(pos, byteBufferNew, size);
     }
 
-    String levelString = "1s 5s 10s 30s 1m 5m 10m 30m";
+    String levelString = "1s 5s 10s 10s 10s 10s 10s 10s 10s 10s";
     private int maxDelayLevel;
     private final ConcurrentSkipListMap<Integer /*level*/, Long /*delay millis*/> delayLevelTable = new ConcurrentSkipListMap<>();
     public void parseDelayLevel() {

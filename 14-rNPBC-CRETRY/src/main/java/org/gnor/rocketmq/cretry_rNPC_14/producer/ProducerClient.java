@@ -104,6 +104,7 @@ public class ProducerClient {
             if (sendResult.getSendStatus() != SendStatus.SEND_OK) {
                 continue;
             }
+            return sendResult;
         }
 
         if (sendResult != null) {

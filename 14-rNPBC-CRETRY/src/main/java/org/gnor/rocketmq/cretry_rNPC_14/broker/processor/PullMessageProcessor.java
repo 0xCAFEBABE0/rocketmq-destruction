@@ -1,5 +1,6 @@
 package org.gnor.rocketmq.cretry_rNPC_14.broker.processor;
 
+import com.alibaba.fastjson2.JSON;
 import io.netty.channel.Channel;
 import org.gnor.rocketmq.common_1.RemotingCommand;
 import org.gnor.rocketmq.cretry_rNPC_14.broker.BrokerStartup;
@@ -22,8 +23,10 @@ public class PullMessageProcessor  {
                 remotingCommand.getConsumerOffset(), remotingCommand.getQueueId(), remotingCommand.getOpaque());
         //todo 可移到RequestHoldService统一管理
         ConcurrentMap<String, List<SuspendRequest>> suspendRequests = this.brokerStartup.getRequestHoldService().getSuspendRequests();
-        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(SuspendRequest.buildKey(topic, remotingCommand.getQueueId()), new ArrayList<>());
+        String key = SuspendRequest.buildKey(topic, remotingCommand.getQueueId());
+        List<SuspendRequest> suspendRequestList = suspendRequests.getOrDefault(key, new ArrayList<>());
         suspendRequestList.add(sr);
-        suspendRequests.put(SuspendRequest.buildKey(topic, remotingCommand.getQueueId()), suspendRequestList);
+        System.out.println("PullMessageProcessor, key:" + key + ", srList: " + JSON.toJSONString(suspendRequestList));
+        suspendRequests.put(key, suspendRequestList);
     }
 }

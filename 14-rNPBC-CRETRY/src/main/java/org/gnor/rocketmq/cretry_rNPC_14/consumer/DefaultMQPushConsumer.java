@@ -58,11 +58,11 @@ public class DefaultMQPushConsumer {
         });
         this.copySubscription(queueTable);
 
-        pullMessageService.sendHeartbeatToBroker(topic);
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 System.out.println("发送心跳：" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                pullMessageService.sendHeartbeatToBroker(topic);
+                pullMessageService.sendHeartbeatToBroker(topic, false);
+                pullMessageService.sendHeartbeatToBroker("%RETRY%TeGroup-C01", true);
             } catch (Throwable t) {
                 t.printStackTrace();
             }

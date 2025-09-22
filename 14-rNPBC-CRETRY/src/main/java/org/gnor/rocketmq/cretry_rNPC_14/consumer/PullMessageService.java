@@ -7,9 +7,10 @@ import org.gnor.rocketmq.cretry_rNPC_14.remoting.InvokeCallback;
 import org.gnor.rocketmq.cretry_rNPC_14.remoting.NettyRemotingClient;
 import org.gnor.rocketmq.cretry_rNPC_14.remoting.ResponseFuture;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -97,6 +98,7 @@ public class PullMessageService implements Runnable {
             @Override
             public void operationSucceed(RemotingCommand response) {
                 // 读取服务器发送的消息
+                System.out.println("收到服务器消息: " + JSON.toJSONString(response));
                 if (response.getFlag() == RemotingCommand.RESPONSE_FLAG) {
 
                     if (response.getCode() == RemotingCommand.CONSUMER_MSG) {
@@ -126,6 +128,8 @@ public class PullMessageService implements Runnable {
                                 requestHeader.setOriginMsgId("");
                                 requestHeader.setMaxReconsumeTimes(defaultMQPushConsumer.getMaxReconsumeTimes());
 
+                                System.out.println("requestHeader: offset:" + requestHeader.getOffset() + ", response:" + JSON.toJSONString(response));
+
                                 request.setHey(response.getHey());
                                 request.setCommitOffset(response.getCommitOffset());
                                 request.setFlag(RemotingCommand.REQUEST_FLAG);
@@ -147,8 +151,6 @@ public class PullMessageService implements Runnable {
 
                         });
                     }
-                } else {
-                    System.out.println("收到服务器消息: " + response.getHey());
                 }
                 executePullRequest(pullRequest);
             }
@@ -188,7 +190,7 @@ public class PullMessageService implements Runnable {
                 put("TAG", "TAG-A");
             }}));
             consumerCmd.setHey("Pull message request from consumer");
-            System.out.println("发送拉取消息请求: " + consumerCmd.getHey());
+            System.out.println("发送拉取消息请求: " + JSON.toJSONString(consumerCmd));
             this.remotingClient.invokeAsync(brokerAddr, consumerCmd, 30000L, invokeCallback);
         } finally {
             //this.executePullRequest(pullRequest);
@@ -227,10 +229,10 @@ public class PullMessageService implements Runnable {
         }
     }
 
-    public boolean sendHeartbeatToBroker(String topic) {
+    public boolean sendHeartbeatToBroker(String topic, boolean retry) {
         brokerAddrTable.forEach((bn, ba) -> {
             String brokerAddr = ba;
-            String clientId = buildMQClientId();
+            String clientId = buildMQClientId(retry);
 
             RemotingCommand remotingCommand = new RemotingCommand();
             remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
@@ -269,12 +271,15 @@ public class PullMessageService implements Runnable {
 
 
     private String instanceName = System.getProperty("rocketmq.client.name", "DEFAULT");
-    public String buildMQClientId() {
+    public String buildMQClientId(boolean retry) {
         StringBuilder sb = new StringBuilder();
         sb.append("127.0.0.1");
 
         sb.append("@");
         sb.append(this.instanceName);
+        if (retry) {
+            sb.append("_RETRY");
+        }
         //if (!UtilAll.isBlank(this.unitName)) {
         //    sb.append("@");
         //    sb.append(this.unitName);

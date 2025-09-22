@@ -32,13 +32,14 @@ public class SendBackProcessor {
         String delay = properties.get("DELAY");
         if (null != delay) {
             int delayTimeLevel = Integer.parseInt(delay);
-            properties.put("REAL_TOPIC", topic);
+            properties.put("REAL_TOPIC", retryTopic);
             properties.put("REAL_QID", String.valueOf(request.getQueueId()));
             request.setTopic("SCHEDULE_TOPIC_XXXX");
             request.setQueueId(delayTimeLevel - 1);
         }
 
-        this.brokerStartup.getMessageStore().appendMessage(retryTopic, request.getHey(), JSON.toJSONString(properties), 1, storedMessage.getReconsumeTimes() + 1);
+        System.out.println("SendBackProcessor: topic" + request.getTopic() + ", storeMsg:" + JSON.toJSONString(storedMessage));
+        this.brokerStartup.getMessageStore().appendMessage(request.getTopic(), request.getHey(), JSON.toJSONString(properties), request.getQueueId(), storedMessage.getReconsumeTimes() + 1);
 
         request.setFlag(RemotingCommand.RESPONSE_FLAG);
         request.setCode(ResponseCode.SUCCESS);

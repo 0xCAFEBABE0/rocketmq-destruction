@@ -57,7 +57,7 @@ public class ReputMessageService extends ServiceThread {
                 this.brokerStartup.getMessageStore().putMessageToCq(dispatchRequest);
                 //激活长轮询等待请求
                 String key = SuspendRequest.buildKey(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
-                this.brokerStartup.getRequestHoldService().notifyMessageArriving(key);
+                this.brokerStartup.getRequestHoldService().notifyMessageArriving(key, "REPUT");
 
                 this.reputFromOffset += size;
                 readSize += size;

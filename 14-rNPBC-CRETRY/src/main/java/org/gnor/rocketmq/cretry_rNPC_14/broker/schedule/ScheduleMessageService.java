@@ -19,7 +19,7 @@ public class ScheduleMessageService {
     private static final long FIRST_DELAY_TIME = 1000L;
     private static final long DELAY_FOR_A_WHILE = 100L;
     private int maxDelayLevel;
-    String levelString = "1s 5s 10s 30s 1m 5m 10m 30m";
+    String levelString = "1s 5s 10s 10s 10s 10s 10s 10s 10s 10s";
 
     public static final String RMQ_SYS_SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
 
@@ -114,8 +114,9 @@ public class ScheduleMessageService {
             }
             MessageStore.StoredMessage storedMessage = brokerStartup.getMessageStore().getMessage(offsetPy, sizePy);
 
+            System.out.println("Scheduler_time: storeMsg:" + JSON.toJSONString(storedMessage));
             storedMessage = messageTimeUp(storedMessage);
-            brokerStartup.getMessageStore().appendMessage(storedMessage.getTopic(), storedMessage.getBody(), JSON.toJSONString(storedMessage.getProperties()), storedMessage.getQueueId(), 0);
+            brokerStartup.getMessageStore().appendMessage(storedMessage.getTopic(), storedMessage.getBody(), JSON.toJSONString(storedMessage.getProperties()), storedMessage.getQueueId(), storedMessage.getReconsumeTimes());
             offsetTable.put(delayLevel, nextOffset);
 
             this.scheduleNextTimerTask(nextOffset, DELAY_FOR_A_WHILE);
@@ -137,7 +138,7 @@ public class ScheduleMessageService {
     }
 
     private MessageStore.StoredMessage messageTimeUp(MessageStore.StoredMessage msg) {
-        MessageStore.StoredMessage storedMessaged = new MessageStore.StoredMessage(msg.getTopic(), msg.getBody(), "FOUND", msg.getQueueId(), msg.getProperties());
+        MessageStore.StoredMessage storedMessaged = new MessageStore.StoredMessage(msg.getTopic(), msg.getBody(), "FOUND", msg.getQueueId(), msg.getProperties(), msg.getReconsumeTimes(), msg.getCommitLogOffset());
 
         Map<String, String> properties = storedMessaged.getProperties();
         storedMessaged.setTopic(properties.get("REAL_TOPIC"));

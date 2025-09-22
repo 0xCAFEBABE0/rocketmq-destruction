@@ -46,10 +46,11 @@ public class RebalanceService implements Runnable {
     public boolean doRebalance() {
         List<MessageQueue> allocateResult = new ArrayList<>();
         topicSubscribeInfoTable.forEach((topic, mqList) -> {
+            System.out.println("doRebalance: " + topic);
             List<String> cidAll = this.getConsumerIdList(topic);
             Collections.sort(cidAll);
             //Collections.sort(mqList);
-            String currentCID = buildMQClientId();
+            String currentCID = buildMQClientId(topic.contains("RETRY"));
 
             int index = cidAll.indexOf(currentCID);  //当前消费者下标
             int mod = mqList.size() % cidAll.size();
@@ -146,12 +147,15 @@ public class RebalanceService implements Runnable {
     }
 
     private String instanceName = System.getProperty("rocketmq.client.name", "DEFAULT");
-    public String buildMQClientId() {
+    public String buildMQClientId(boolean retry) {
         StringBuilder sb = new StringBuilder();
         sb.append("127.0.0.1");
 
         sb.append("@");
         sb.append(this.instanceName);
+        if (retry) {
+            sb.append("_RETRY");
+        }
         //if (!UtilAll.isBlank(this.unitName)) {
         //    sb.append("@");
         //    sb.append(this.unitName);

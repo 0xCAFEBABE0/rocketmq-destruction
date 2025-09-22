@@ -122,6 +122,20 @@ public class BrokerStartup {
             throw new RuntimeException(e);
         }
 
+        remotingCommand = new RemotingCommand();
+        remotingCommand.setFlag(RemotingCommand.REQUEST_FLAG);
+        remotingCommand.setCode(RemotingCommand.REGISTER_BROKER);
+        remotingCommand.setBrokerName("Broker-01");
+        remotingCommand.setBrokerAddr("127.0.0.1:9011");
+        remotingCommand.setTopic("%RETRY%TeGroup-C01");
+        remotingCommand.setTopicQueueNums(1);
+        try {
+            RemotingCommand responseCmd = this.remotingClient.invokeSync("127.0.0.1:9091", remotingCommand, 30000L);
+            System.out.println(responseCmd.getHey());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         this.consumerOffsetManager.load();
 
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
