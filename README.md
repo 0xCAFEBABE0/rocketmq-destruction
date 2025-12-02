@@ -14,9 +14,10 @@
 - (12-rNPBC-DELAY) 延迟消息
 - (13-rNPBC-PRETRY) 生产端重试消息
 - (14-rNPBC-CRETRY) 消费端重试
+- (15-rNPBC-ORDER) 顺序消息
+
 
 结构化改造
-- broker：顺序消息
 - broker：实现事务消息
 - broker：引入消息压缩
 
@@ -35,6 +36,14 @@
 
 消息中间件的设计，围绕两个核心问题展开
 - 存储的可靠性
+  - 消息存储在本地内存中，重启丢失
+  - 写在DB引入额外的依赖，相当于多引入了一条导致故障的分支
+  - 写入本地文件，需要解决三个问题：io的效率，写时的原子性，重启的可恢复性
+    - CommitLog、ConsumeQueue、IndexFile，解决io效率
+      - CommitLog如何记录当前消息写到哪，故障恢复从哪个位置开始？
+        - StoreCheckPoint、abort文件
+      - 消费进度管理
+    - MappedByteBuffer映射CommitLog，解决写时的原子性
 - 投递的可靠性
 保证at-least-once语义
 
